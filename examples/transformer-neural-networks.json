@@ -1,0 +1,170 @@
+{
+  "id": "transformer-neural-networks",
+  "topic": "transformer neural networks",
+  "title": "Transformers: Attention Is All You Need",
+  "emoji": "🤖",
+  "createdAt": "2026-08-10T12:00:00Z",
+  "depth": "standard",
+  "layout": "board",
+  "blocks": [
+    {
+      "type": "summary",
+      "title": "The big picture",
+      "markdown": "The **transformer** is the neural network architecture behind modern AI — GPT, Claude, BERT, and nearly every frontier model. Introduced in the 2017 paper *Attention Is All You Need*, it replaced recurrence with a single powerful idea: **self-attention**, which lets every token in a sequence look at every other token directly.\n\nThree properties made it take over the field:\n\n- **Parallelism** — unlike RNNs, all positions are processed at once, so training scales across GPUs.\n- **Long-range connections** — any token can attend to any other in one step, no matter the distance.\n- **Scaling laws** — performance improves predictably as you add parameters and data.\n\nBy the end of this board you'll understand attention, the full architecture, how these models are trained, and where to go deeper."
+    },
+    {
+      "type": "roadmap",
+      "title": "Your path to mastery",
+      "steps": [
+        { "label": "Embeddings & tokens", "detail": "How text becomes vectors a network can process." },
+        { "label": "Self-attention", "detail": "Queries, keys, values — the heart of the transformer." },
+        { "label": "Multi-head attention & positional encoding", "detail": "Many attention patterns at once, plus a sense of order." },
+        { "label": "The full block", "detail": "Residual connections, layer norm, and feed-forward layers stacked N times." },
+        { "label": "Training & scaling", "detail": "Next-token prediction, pretraining vs fine-tuning, scaling laws." },
+        { "label": "Variants & frontier", "detail": "Encoder-only, decoder-only, mixture-of-experts, long context." }
+      ]
+    },
+    {
+      "type": "concept",
+      "title": "Self-attention: queries, keys, values",
+      "tagline": "Every word asks every other word: how relevant are you to me?",
+      "markdown": "Each token's embedding is projected into three vectors: a **query** (what am I looking for?), a **key** (what do I contain?), and a **value** (what do I contribute?).\n\nAttention scores come from dot products of queries with keys, scaled and softmaxed:\n\n```\nAttention(Q, K, V) = softmax(QKᵀ / √d_k) · V\n```\n\nIn *\"The animal didn't cross the street because **it** was tired\"*, the token `it` produces a query that matches the key of `animal` far more than `street` — so its output vector is built mostly from `animal`'s value. That's disambiguation, learned purely from data."
+    },
+    {
+      "type": "concept",
+      "title": "Multi-head attention",
+      "tagline": "One attention pattern is never enough.",
+      "markdown": "Instead of a single attention function, the transformer runs **h parallel heads** (8 in the original paper), each with its own learned Q/K/V projections over a lower-dimensional subspace.\n\nDifferent heads learn different relationships:\n\n- one head tracks **syntax** (subject ↔ verb),\n- another tracks **coreference** (pronoun ↔ noun),\n- another watches **adjacent tokens**.\n\nTheir outputs are concatenated and projected back — giving the model many *representation subspaces* to reason in simultaneously."
+    },
+    {
+      "type": "concept",
+      "title": "Positional encoding",
+      "tagline": "Attention is order-blind — position must be injected.",
+      "markdown": "Self-attention treats its input as a **set**: shuffle the tokens and the attention scores shuffle with them. Language obviously cares about order, so transformers add position information to each embedding.\n\n- **Sinusoidal encodings** (the original): fixed sine/cosine waves of different frequencies.\n- **Learned positional embeddings**: just train a vector per position.\n- **RoPE (rotary)** — used by most modern LLMs: rotates Q/K vectors by an angle proportional to position, which elegantly encodes *relative* distances and extrapolates to longer contexts."
+    },
+    {
+      "type": "diagram",
+      "title": "Anatomy of a transformer block",
+      "mermaid": "flowchart TD\n  IN[\"Input embeddings + positions\"] --> MHA[\"Multi-head self-attention\"]\n  MHA --> ADD1[\"Add & LayerNorm\"]\n  IN --> ADD1\n  ADD1 --> FFN[\"Feed-forward network\"]\n  FFN --> ADD2[\"Add & LayerNorm\"]\n  ADD1 --> ADD2\n  ADD2 --> OUT[\"To next block — stacked N times\"]",
+      "caption": "One block: attention mixes information across tokens; the FFN transforms each token; residuals + norms keep gradients healthy."
+    },
+    {
+      "type": "diagram",
+      "title": "The transformer landscape",
+      "mermaid": "mindmap\n  root((Transformers))\n    Mechanics\n      Self-attention\n      Multi-head\n      Positional encoding\n      Feed-forward\n    Training\n      Next-token prediction\n      Pretraining\n      Fine-tuning & RLHF\n      Scaling laws\n    Families\n      Decoder-only GPT-style\n      Encoder-only BERT-style\n      Encoder-decoder T5-style\n    Frontier\n      Mixture-of-experts\n      Long context\n      Multimodal",
+      "caption": "The whole territory this board covers."
+    },
+    {
+      "type": "code",
+      "title": "Self-attention in 20 lines of PyTorch",
+      "language": "python",
+      "code": "import torch\nimport torch.nn.functional as F\n\ndef self_attention(x, W_q, W_k, W_v):\n    \"\"\"x: (seq_len, d_model) — one sequence, no batching for clarity.\"\"\"\n    Q = x @ W_q          # (seq, d_k)  what each token is looking for\n    K = x @ W_k          # (seq, d_k)  what each token contains\n    V = x @ W_v          # (seq, d_v)  what each token contributes\n\n    d_k = Q.shape[-1]\n    scores = Q @ K.T / d_k ** 0.5       # (seq, seq) relevance of j to i\n    weights = F.softmax(scores, dim=-1)  # rows sum to 1\n    return weights @ V                   # blend values by relevance\n\nseq_len, d_model, d_k = 6, 32, 16\nx = torch.randn(seq_len, d_model)\nW_q, W_k, W_v = (torch.randn(d_model, d_k) for _ in range(3))\nprint(self_attention(x, W_q, W_k, W_v).shape)  # torch.Size([6, 16])",
+      "explanation": "The entire mechanism is three matrix multiplies, a scale, and a softmax. Causal (GPT-style) attention adds one line: mask the upper triangle of `scores` with `-inf` so tokens can't see the future."
+    },
+    {
+      "type": "note",
+      "title": "Mental models that unlock it",
+      "markdown": "- **Attention is a soft dictionary lookup.** A query fuzzy-matches all keys and returns a weighted blend of values — differentiable, so it's learnable.\n- **The FFN is where facts live; attention is where routing happens.** Roughly two-thirds of parameters are in feed-forward layers.\n- **Residual stream as a shared whiteboard**: each layer reads from and writes small updates onto a running vector per token.\n- **Beware the quadratic**: attention costs O(n²) in sequence length — this is why long context is hard and why FlashAttention, sliding windows, and sparse variants exist."
+    },
+    {
+      "type": "quiz",
+      "title": "Check your understanding",
+      "questions": [
+        {
+          "question": "Why are attention scores divided by √d_k?",
+          "options": [
+            "To keep dot products from growing large and saturating the softmax",
+            "To normalize the value vectors",
+            "To make training deterministic",
+            "It's an arbitrary convention"
+          ],
+          "answerIndex": 0,
+          "explanation": "Large dot products push softmax into regions with tiny gradients; scaling by √d_k keeps scores in a healthy range."
+        },
+        {
+          "question": "What does multi-head attention add over a single head?",
+          "options": [
+            "It makes attention run faster",
+            "Multiple learned relationship patterns attended to in parallel subspaces",
+            "It removes the need for positional encoding",
+            "It reduces parameter count"
+          ],
+          "answerIndex": 1,
+          "explanation": "Each head has its own Q/K/V projections and can specialize — syntax, coreference, locality — simultaneously."
+        },
+        {
+          "question": "Why do transformers need positional encodings at all?",
+          "options": [
+            "To speed up convergence",
+            "Because embeddings are too small",
+            "Because self-attention is permutation-invariant — without positions, word order is invisible",
+            "To prevent overfitting"
+          ],
+          "answerIndex": 2,
+          "explanation": "Attention over a shuffled sequence gives identical (shuffled) results; position must be injected explicitly."
+        },
+        {
+          "question": "GPT-style models are…",
+          "options": [
+            "Encoder-only transformers",
+            "Decoder-only transformers with causal masking",
+            "Encoder-decoder transformers",
+            "Recurrent networks with attention"
+          ],
+          "answerIndex": 1,
+          "explanation": "They use a causal mask so each token attends only to the past, trained on next-token prediction."
+        },
+        {
+          "question": "The computational cost of vanilla self-attention grows with sequence length n as…",
+          "options": ["O(n)", "O(n log n)", "O(n²)", "O(2ⁿ)"],
+          "answerIndex": 2,
+          "explanation": "Every token attends to every other token — an n×n score matrix."
+        }
+      ]
+    },
+    {
+      "type": "flashcards",
+      "title": "Drill the essentials",
+      "cards": [
+        { "front": "Query, Key, Value", "back": "Three projections of each token: what I'm looking for, what I contain, what I contribute." },
+        { "front": "Softmax(QKᵀ/√d_k)V", "back": "The scaled dot-product attention formula." },
+        { "front": "Causal mask", "back": "Upper-triangular -∞ mask that stops tokens attending to future positions (GPT-style)." },
+        { "front": "Residual stream", "back": "The running per-token vector each layer reads from and writes to." },
+        { "front": "RoPE", "back": "Rotary positional embedding — rotates Q/K by position-dependent angles; encodes relative position." },
+        { "front": "Scaling laws", "back": "Loss falls predictably as a power law in parameters, data, and compute." },
+        { "front": "KV cache", "back": "Stored keys/values of past tokens so generation only computes attention for the new token." },
+        { "front": "Mixture-of-experts", "back": "FFN replaced by many expert FFNs; a router activates a few per token — more capacity per FLOP." }
+      ]
+    },
+    {
+      "type": "glossary",
+      "title": "Speak the language",
+      "entries": [
+        { "term": "Token", "definition": "The unit of text a model processes — usually a subword piece, ~0.75 words on average." },
+        { "term": "Embedding", "definition": "A learned dense vector representing a token." },
+        { "term": "Logits", "definition": "Raw pre-softmax scores over the vocabulary for the next token." },
+        { "term": "Layer normalization", "definition": "Normalizes activations per token to stabilize training; modern models use RMSNorm and pre-norm placement." },
+        { "term": "Context window", "definition": "Maximum number of tokens the model can attend over at once." },
+        { "term": "Autoregressive", "definition": "Generating one token at a time, each conditioned on everything before it." }
+      ]
+    },
+    {
+      "type": "resource",
+      "title": "The Illustrated Transformer",
+      "url": "https://jalammar.github.io/illustrated-transformer/",
+      "source": "jalammar.github.io",
+      "description": "The classic visual walkthrough — the single best first read on the architecture."
+    },
+    {
+      "type": "resource",
+      "title": "Attention Is All You Need (the paper)",
+      "url": "https://arxiv.org/abs/1706.03762",
+      "source": "arxiv.org",
+      "description": "The 2017 original. Short, readable, and historic — read it after the illustrated guide."
+    }
+  ],
+  "sources": [
+    { "title": "Attention Is All You Need", "url": "https://arxiv.org/abs/1706.03762", "snippet": "Vaswani et al., 2017 — the paper that introduced the transformer." },
+    { "title": "The Illustrated Transformer", "url": "https://jalammar.github.io/illustrated-transformer/", "snippet": "Visual guide to the architecture." }
+  ]
+}

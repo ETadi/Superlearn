@@ -1,0 +1,13 @@
+{
+  "name": "superlearn",
+  "version": "1.0.0",
+  "description": "The world's most advanced learning system, inside Claude Code. Type /superlearn <topic> — it scrapes the web and YouTube, runs an iterative research loop, synthesizes everything into a beautiful learning board, and serves an interactive local web app: Pinterest-style boards, notes, diagrams, mindmaps, quizzes, flashcards and embedded videos.",
+  "author": {
+    "name": "Raiyan Yahya",
+    "url": "https://github.com/raiyanyahya"
+  },
+  "homepage": "https://github.com/raiyanyahya/superlearn",
+  "repository": "https://github.com/raiyanyahya/superlearn",
+  "license": "MIT",
+  "keywords": ["learning", "education", "research", "scraping", "flashcards", "quizzes", "mindmaps"]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "superlearn-marketplace",
+  "owner": {
+    "name": "Raiyan Yahya",
+    "url": "https://github.com/raiyanyahya"
+  },
+  "plugins": [
+    {
+      "name": "superlearn",
+      "source": "./",
+      "description": "Learn anything, beautifully. AI research pipeline + interactive local learning boards, powered by your Claude Code subscription."
+    }
+  ]
+}

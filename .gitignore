@@ -1,0 +1,10 @@
+# Superlearn workspaces created at runtime (research scratch + boards)
+.superlearn/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
