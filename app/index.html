@@ -118,6 +118,8 @@
     background-color: var(--ink-950);
     background-image: var(--bg-image, none);
     background-size: var(--bg-size, auto);
+    background-repeat: var(--bg-repeat, repeat);
+    background-attachment: var(--bg-attach, scroll);
     background-attachment: fixed;
     color: var(--ink-200);
     font-family: var(--font-body);
@@ -601,6 +603,36 @@
   .lib-edgelabel { fill: var(--ink-400); font-size: 11px; }
   .lib-empty { color: var(--ink-400); font-size: 14px; line-height: 1.7; max-width: 480px; text-align: center; }
 
+  /* ── Wallpaper picker ───────────────────────────────── */
+  .wp-btn {
+    position: fixed; bottom: 18px; right: 18px; z-index: 40;
+    width: 42px; height: 42px; border-radius: 13px; font-size: 17px;
+    background: var(--ink-900); border: 1px solid var(--ink-700); color: var(--ink-300);
+  }
+  .wp-btn:hover { border-color: var(--accent); color: var(--ink-100); }
+  .wp-pop {
+    position: fixed; bottom: 68px; right: 18px; z-index: 41; width: 272px;
+    background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 14px;
+    padding: 13px; box-shadow: 0 16px 44px -14px rgba(0,0,0,.6);
+  }
+  .wp-pop[hidden] { display: none; }
+  .wp-pop h5 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .14em;
+               color: var(--ink-500); margin: 0 0 10px 2px; font-weight: 700; }
+  .wp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .wp-swatch {
+    position: relative; height: 62px; border-radius: 10px; overflow: hidden;
+    border: 1.5px solid var(--ink-700); background-color: var(--ink-950); cursor: pointer;
+  }
+  .wp-swatch:hover { border-color: var(--ink-600); }
+  .wp-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .wp-swatch .wlabel {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 0 4px;
+    font-size: 10px; text-align: center; color: var(--ink-200);
+    background: color-mix(in srgb, var(--ink-950) 72%, transparent);
+  }
+  .wp-swatch .wmark { position: absolute; inset: 0; display: grid; place-items: center;
+                      font-size: 18px; color: var(--ink-400); }
+
   /* ── Focus mode ─────────────────────────────────────── */
   .focus-overlay {
     position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column;
@@ -941,6 +973,7 @@ function applyTheme(theme) {
   } else {
     root.removeProperty("--accent"); // fall back to the preset's accent
   }
+  loadWallpaper();
 }
 
 function currentThemeIsDark() {
@@ -2903,6 +2936,79 @@ async function openLibrary() {
   stage.append(root);
 }
 
+/* ── Wallpaper picker ──────────────────────────────────────────────────
+   Every theme ships a background; this lets the reader turn it off or
+   swap it. Patterns draw from the theme's own ink and accent variables,
+   so each option works across all six themes. The choice is a viewer
+   preference, stored per board in localStorage — never in the board.   */
+
+const WALLPAPERS = [
+  { key: "default", label: "Theme" },   // whatever the theme designed
+  { key: "none", label: "Plain", vars: { image: "none" } },
+  { key: "grid", label: "Grid", vars: {
+    image: "linear-gradient(color-mix(in srgb, var(--ink-600) 26%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--ink-600) 26%, transparent) 1px, transparent 1px)",
+    size: "34px 34px" } },
+  { key: "dots", label: "Dots", vars: {
+    image: "radial-gradient(color-mix(in srgb, var(--ink-600) 40%, transparent) 1.2px, transparent 1.2px)",
+    size: "24px 24px" } },
+  { key: "hatch", label: "Hatch", vars: {
+    image: "repeating-linear-gradient(45deg, color-mix(in srgb, var(--ink-600) 17%, transparent) 0 1px, transparent 1px 13px)" } },
+  { key: "aurora", label: "Aurora", vars: {
+    image: "radial-gradient(1100px 620px at 85% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%), radial-gradient(900px 600px at -10% 45%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 55%), radial-gradient(800px 520px at 55% 110%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 60%)",
+    repeat: "no-repeat", attach: "fixed" } },
+];
+
+function wallpaperStoreKey() { return `superlearn.wallpaper.${state.board?.id ?? "global"}`; }
+
+function applyWallpaper(key) {
+  const wp = WALLPAPERS.find((w) => w.key === key) ?? WALLPAPERS[0];
+  const root = document.documentElement.style;
+  if (!wp.vars) {
+    // Back to the theme's own design: drop the overrides entirely.
+    for (const v of ["--bg-image", "--bg-size", "--bg-repeat", "--bg-attach"]) root.removeProperty(v);
+  } else {
+    root.setProperty("--bg-image", wp.vars.image);
+    root.setProperty("--bg-size", wp.vars.size ?? "auto");
+    root.setProperty("--bg-repeat", wp.vars.repeat ?? "repeat");
+    root.setProperty("--bg-attach", wp.vars.attach ?? "scroll");
+  }
+  for (const b of document.querySelectorAll(".wp-swatch")) {
+    b.classList.toggle("on", b.dataset.wp === wp.key);
+  }
+}
+
+function loadWallpaper() {
+  applyWallpaper(localStorage.getItem(wallpaperStoreKey()) ?? "default");
+}
+
+function wireWallpaper() {
+  const btn = el("button", { class: "wp-btn no-print", title: "Wallpaper" }, ["❖"]);
+  const pop = el("div", { class: "wp-pop no-print", hidden: "" });
+  pop.append(el("h5", {}, ["Wallpaper"]));
+  const grid = el("div", { class: "wp-grid" });
+  for (const wp of WALLPAPERS) {
+    const sw = el("button", { class: "wp-swatch", "data-wp": wp.key, title: wp.label });
+    if (wp.key === "default") sw.append(el("span", { class: "wmark" }, ["✦"]));
+    else if (wp.vars.image !== "none") {
+      sw.style.backgroundImage = wp.vars.image;
+      sw.style.backgroundSize = wp.vars.size ?? "auto";
+      sw.style.backgroundRepeat = wp.vars.repeat ?? "repeat";
+    }
+    sw.append(el("span", { class: "wlabel" }, [wp.label]));
+    sw.addEventListener("click", () => {
+      localStorage.setItem(wallpaperStoreKey(), wp.key);
+      applyWallpaper(wp.key);
+    });
+    grid.append(sw);
+  }
+  pop.append(grid);
+  btn.addEventListener("click", () => (pop.hidden = !pop.hidden));
+  document.addEventListener("pointerdown", (e) => {
+    if (!pop.hidden && !e.target.closest(".wp-pop, .wp-btn")) pop.hidden = true;
+  });
+  document.body.append(btn, pop);
+}
+
 /* ── TOC rail: jump navigation for document-shaped views ───────────── */
 
 let tocObserver = null;
@@ -3245,6 +3351,8 @@ document.addEventListener("keydown", (e) => {
     researchOverlay.hidden = true;
     reviewOverlay.hidden = true;
     $("#libOverlay").hidden = true;
+    const wpop = document.querySelector(".wp-pop");
+    if (wpop) wpop.hidden = true;
     return;
   }
   // Arrow keys drive focus mode (but never while typing in a field).
@@ -3255,6 +3363,7 @@ document.addEventListener("keydown", (e) => {
 });
 wireZoom();
 wireHighlights();
+wireWallpaper();
 $("#libBtn").addEventListener("click", openLibrary);
 $("#libClose").addEventListener("click", () => ($("#libOverlay").hidden = true));
 $("#libOverlay").addEventListener("click", (e) => { if (e.target === $("#libOverlay")) $("#libOverlay").hidden = true; });

@@ -205,6 +205,7 @@ Every plan, note, and raw scraper dump is saved and browsable in the app — so 
 
 - **"Updated" badges** on cards Claude changed since your last visit
 - **Cross-board links** — related concepts jump between boards and highlight the target card
+- **Wallpaper picker** — the ❖ button swaps the board's background: the theme's own design, plain, grid, dots, hatch, or an accent-tinted aurora. Per board, remembered
 - **Click-to-play video lectures**, and copy buttons on every code block
 - **Full-text filtering**, JSON export, print/PDF
 - **Standalone HTML export** — one file that opens anywhere; `--offline` bakes in the diagram and math engines and the board's figures too, so it works on a plane
