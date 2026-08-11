@@ -11,7 +11,12 @@ and serves you an interactive learning board that keeps growing as you ask for m
 
 </div>
 
-![The Superlearn board view](docs/screenshots/hero-board.png)
+<div align="center">
+  <em>One real board, top to bottom — <code>/superlearn how Postgres internals work</code>.<br/>
+  38 blocks: concepts, diagrams, charts, runnable code, papers and talks. Nothing trimmed.</em>
+</div>
+
+![A full Superlearn board on Postgres internals, scrolled end to end](docs/screenshots/hero-board.png)
 
 ---
 
@@ -45,6 +50,7 @@ claude --plugin-dir /path/to/superlearn
 **Then just ask:**
 
 ```
+/superlearn how Postgres internals work
 /superlearn transformer neural networks
 /superlearn rust ownership — I already know C++
 /superlearn react hooks for my frontend interview
@@ -218,6 +224,12 @@ Serve existing boards any time without re-researching:
 python3 scripts/serve.py --boards-dir .superlearn/boards --port 4321
 ```
 
+The board in the screenshot above ships in [`examples/`](examples/) — serve it and click around before installing anything:
+
+```bash
+python3 scripts/serve.py --boards-dir examples --port 4321
+```
+
 ## Board format
 
 Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `chart`, `image`, `code`, `video`, `resource`, `flashcards`, `glossary`. Markdown fields render TeX. Any block may carry your `annotation` and `related` cross-board links.
@@ -233,7 +245,7 @@ skills/superlearn/ the research → design → author → serve → iterate play
 agents/            parallel subtopic researcher
 scripts/           scrapers, validator, exporter, server, publisher
 app/               the Superlearn web app (single file, zero build step)
-examples/          a ready-to-serve example board
+examples/          ready-to-serve example boards
 ```
 
 ## Notes on privacy and security

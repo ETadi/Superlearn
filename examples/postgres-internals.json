@@ -1,0 +1,563 @@
+{
+  "id": "postgres-internals",
+  "topic": "how Postgres internals work",
+  "title": "Postgres Internals: How It Actually Works",
+  "emoji": "🐘",
+  "createdAt": "2026-08-11T10:30:00Z",
+  "mode": "study",
+  "depth": "deep",
+  "layout": "board",
+  "theme": {
+    "preset": "blueprint",
+    "accent": "#5eb3e4"
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "title": "The big picture",
+      "markdown": "Postgres looks like one program and behaves like a small operating system. A single **postmaster** process owns a shared memory segment; every client connection gets its own forked **backend** process; a handful of auxiliary processes handle durability and cleanup in the background.\n\nAlmost everything surprising about Postgres follows from one design decision: **it never modifies a row in place.** An UPDATE writes a new version of the row and marks the old one superseded. That single choice explains, in a chain:\n\n- why readers never block writers and writers never block readers,\n- why `UPDATE` can be slower than `INSERT`,\n- why tables bloat and `VACUUM` has to exist,\n- why a 32-bit transaction counter can threaten to shut your database down,\n- why an index scan usually still has to touch the heap.\n\nUnderneath sits an equally simple durability rule — **write the log before the data** — from which checkpoints, crash recovery, point-in-time restore and streaming replication all fall out as the same mechanism wearing different hats.\n\nThis board works from the disk upward: the page, the tuple, visibility, the log, the cache, then the planner and executor that sit on top of all of it."
+    },
+    {
+      "type": "roadmap",
+      "title": "A path through the engine",
+      "steps": [
+        {
+          "label": "Processes and shared memory",
+          "detail": "Who is running, what they share, and why that forces explicit locking."
+        },
+        {
+          "label": "The 8 KB page",
+          "detail": "Line pointers, tuple headers, and the indirection everything else leans on."
+        },
+        {
+          "label": "MVCC",
+          "detail": "xmin, xmax, snapshots — the visibility rule, exactly."
+        },
+        {
+          "label": "WAL and checkpoints",
+          "detail": "The write-ahead rule, LSNs, full page writes, crash recovery."
+        },
+        {
+          "label": "VACUUM and wraparound",
+          "detail": "Why cleanup is mandatory and what happens when it falls behind."
+        },
+        {
+          "label": "The buffer manager",
+          "detail": "Clock sweep, pinning, and why big scans do not evict your cache."
+        },
+        {
+          "label": "Planning and execution",
+          "detail": "Parser, rewriter, cost-based planner, volcano executor."
+        },
+        {
+          "label": "Access methods",
+          "detail": "B-tree, GIN, GiST, BRIN — and what an index-only scan really needs."
+        }
+      ]
+    },
+    {
+      "type": "diagram",
+      "title": "Who is actually running",
+      "mermaid": "flowchart TD\n  C1[\"Client\"] --> PM[\"postmaster\"]\n  C2[\"Client\"] --> PM\n  PM -->|\"fork per connection\"| B1[\"backend\"]\n  PM -->|\"fork per connection\"| B2[\"backend\"]\n  PM --> BG[\"background writer\"]\n  PM --> CK[\"checkpointer\"]\n  PM --> WW[\"WAL writer\"]\n  PM --> AV[\"autovacuum launcher\"]\n  B1 --> SHM[\"Shared memory\"]\n  B2 --> SHM\n  BG --> SHM\n  CK --> SHM\n  WW --> SHM\n  AV --> SHM\n  SHM --> SB[\"shared_buffers\"]\n  SHM --> WB[\"WAL buffers\"]\n  SHM --> LK[\"lock tables\"]\n  SB --> DISK[\"Data files\"]\n  WB --> WAL[\"pg_wal\"]",
+      "caption": "Process-per-connection, not thread-per-connection. Backends are separate OS processes, so everything they share must live in one shared memory segment — and every access to it must be locked."
+    },
+    {
+      "type": "concept",
+      "title": "Process and memory architecture",
+      "tagline": "A separate OS process per connection — which is why shared memory is the whole story.",
+      "markdown": "The **postmaster** starts first. It reads the configuration, allocates the shared memory segment, and forks the auxiliary processes. Then it mostly waits: for each new connection it forks a **backend** and hands the socket over.\n\nThat backend does *everything* for the session — reads the protocol stream, parses the SQL, plans it, executes it, manages the transaction, returns rows. There is no thread pool and no work-stealing scheduler. (Parallel query added worker processes for a single query, but the unit is still a process.)\n\n### What this buys, and what it costs\n\nA crashing backend can be reaped without taking down the server, and there is no shared heap to corrupt. The cost is that a connection is an OS process with its own page tables — which is precisely why a connection pooler stops being optional at a few hundred clients, and why `work_mem` is a **per-node, per-backend** budget rather than a global one. A query with four sorts, run by fifty backends, can allocate two hundred times `work_mem`.\n\n### The shared parts\n\nBecause backends share no address space, everything collaborative lives in the shared memory segment: `shared_buffers`, the WAL buffers, the lock tables, the commit log. Nothing there is protected by language-level synchronization — it is guarded by **lightweight locks** taken by hand. That is why the lock manager is a first-class subsystem rather than an implementation detail.\n\nThe auxiliary processes are each doing one boring, essential job: the **background writer** trickles dirty buffers out so backends rarely have to write one themselves; the **checkpointer** does the heavy periodic flush; the **WAL writer** pushes the log out so commits find their work already done; the **autovacuum launcher** starts workers against tables that have accumulated enough dead rows."
+    },
+    {
+      "type": "diagram",
+      "title": "Inside an 8 KB page",
+      "mermaid": "flowchart LR\n  subgraph PAGE[\"One 8192-byte page\"]\n    direction TB\n    H[\"Page header - 24 bytes<br/>LSN, checksum, pd_lower, pd_upper\"]\n    LP[\"Line pointers - 4 bytes each<br/>grow downward\"]\n    FS[\"Free space<br/>pd_lower to pd_upper\"]\n    T2[\"Tuple 2\"]\n    T1[\"Tuple 1\"]\n    H --> LP --> FS --> T2 --> T1\n  end\n  IDX[\"Index entry\"] -->|\"points at a line pointer,<br/>never a byte offset\"| LP\n  LP -->|\"redirect\"| T1",
+      "caption": "The page grows from both ends and meets in the middle. Because indexes address line pointers rather than offsets, Postgres can shuffle tuples inside a page — or replace one entirely via a HOT update — without touching a single index."
+    },
+    {
+      "type": "concept",
+      "title": "The 8 KB page, and the indirection that matters",
+      "tagline": "Every file is pages; every page is a tiny two-ended allocator.",
+      "markdown": "Heaps, indexes, the free space map and the visibility map are all the same shape on disk: a sequence of fixed-length pages, **8192 bytes** by default.\n\nA page has four regions and grows from **both ends**:\n\n| Region | Size | Grows |\n|---|---|---|\n| Page header | 24 bytes | fixed |\n| Line pointer array | 4 bytes each | downward from the header |\n| Free space | `pd_lower` → `pd_upper` | shrinks from both sides |\n| Tuple data | variable | upward from the end |\n\nFree space is not tracked in a structure — it is literally the gap between `pd_lower` and `pd_upper`.\n\n### The load-bearing idea\n\nA tuple's address, its **ctid**, is a `(block number, line pointer index)` pair — *not* a byte offset. Index entries store that pair. So the physical position of a tuple inside its page is free to change: Postgres can defragment a page, or point a line pointer at a different tuple, and every index still resolves correctly.\n\nThat one indirection pays for two major optimizations:\n\n- **HOT updates** — if the new row version fits on the same page and no indexed column   changed, the old line pointer is turned into a redirect to the new tuple. **No index is   touched at all.** This is why `fillfactor` below 100 can dramatically cut index write   traffic on update-heavy tables: you are deliberately leaving room for the next version.\n- **Page defragmentation** — VACUUM can compact live tuples toward the end of the page and   reclaim the holes without any index maintenance.\n\n### Tuples and TOAST\n\nEach tuple carries a header of 23 bytes (padded, so `t_hoff` is normally 24) holding `t_xmin`, `t_xmax`, `t_ctid` and the info-mask bits, followed by an optional null bitmap, then your data.\n\nA tuple may not span pages. So when a row would exceed roughly 2 KB (a quarter page), **TOAST** takes over: oversized attributes are compressed, and if still too large, sliced into chunks in a side table, leaving an 18-byte pointer behind. This is invisible until it isn't — a `SELECT *` on a wide row silently reassembles those chunks, which is one of the more common sources of mysterious I/O."
+    },
+    {
+      "type": "concept",
+      "title": "MVCC: what a transaction is allowed to see",
+      "tagline": "Two integers in every tuple header decide everything.",
+      "markdown": "Postgres keeps **multiple physical versions of the same logical row** and decides per transaction which one is real. The decision needs only two fields from the tuple header:\n\n- **`t_xmin`** — the transaction that created this version\n- **`t_xmax`** — the transaction that deleted or superseded it, `0` while live\n\n### The snapshot\n\nWhen a transaction needs a consistent view it takes a **snapshot**: the oldest still-running XID, the first not-yet-assigned XID, and the list of XIDs in flight right now. A version is visible when:\n\n1. its `xmin` **committed**, and committed *before* the snapshot was taken, **and**\n2. its `xmax` is zero, or aborted, or still in the snapshot's future.\n\nCommit status is not in the tuple — it lives in the commit log (`pg_xact`). The first reader to check a tuple after commit caches the answer back into the tuple's info-mask **hint bits**, which is why the first `SELECT` after a big write can dirty pages and generate write I/O even though it changed nothing you asked about.\n\n### UPDATE is DELETE + INSERT\n\nThere is no in-place update. The old version gets `xmax` set to the updating XID; a new version is inserted with `xmin` set to the same XID. Both sit on the page. Everything else follows:\n\n- **Readers never block writers, writers never block readers.** They are looking at different   physical tuples, so no lock is needed between them.\n- **Rollback is nearly free.** Aborting writes one byte in the commit log; the versions the   transaction created simply never become visible.\n- **Dead versions pile up**, and something has to remove them. That is VACUUM.\n- A dead version can only be removed once its `xmax` is older than the **oldest snapshot still   in use** in the entire cluster. One forgotten `BEGIN;` in a psql window pins that horizon   and stops cleanup on every table in the database. This is the single most common cause of   runaway bloat in production."
+    },
+    {
+      "type": "code",
+      "title": "Watch MVCC decide — press Run",
+      "language": "python",
+      "code": "\"\"\"The visibility rule that decides what every Postgres query can see.\"\"\"\n\nCOMMITTED, ABORTED, RUNNING = \"committed\", \"aborted\", \"running\"\n\n# The commit log (pg_xact / clog) — one status per transaction id.\nclog = {100: COMMITTED, 101: COMMITTED, 102: RUNNING, 103: ABORTED}\n\nclass Snapshot:\n    \"\"\"What a transaction froze in time when it took its snapshot.\"\"\"\n    def __init__(self, xmin, xmax, in_progress):\n        self.xmin = xmin                    # oldest still-running xid\n        self.xmax = xmax                    # first xid not yet assigned\n        self.in_progress = set(in_progress)\n\n    def in_past(self, xid):\n        \"\"\"True if xid had already finished when the snapshot was taken.\"\"\"\n        if xid >= self.xmax:                # started after we did\n            return False\n        if xid in self.in_progress:         # running when we looked\n            return False\n        return True\n\ndef visible(tup, snap):\n    xmin, xmax = tup[\"xmin\"], tup[\"xmax\"]\n    # The version must have been created by a transaction that committed\n    # in our past — otherwise it either never happened or is not ours to see.\n    if clog.get(xmin) != COMMITTED or not snap.in_past(xmin):\n        return False\n    if xmax == 0:                           # never deleted: live\n        return True\n    # It was deleted — but only a delete that committed in our past hides it.\n    if clog.get(xmax) != COMMITTED or not snap.in_past(xmax):\n        return True\n    return False\n\n# One logical row, three physical versions — exactly what an UPDATE leaves behind.\nheap = [\n    {\"label\": \"v1 'alice'   inserted by 100, superseded by 101\", \"xmin\": 100, \"xmax\": 101},\n    {\"label\": \"v2 'ALICE'   inserted by 101, still live       \", \"xmin\": 101, \"xmax\": 0},\n    {\"label\": \"v3 'Alicia'  inserted by 102 (still running)   \", \"xmin\": 102, \"xmax\": 0},\n    {\"label\": \"v4 'oops'    inserted by 103 (rolled back)     \", \"xmin\": 103, \"xmax\": 0},\n]\n\nsnap = Snapshot(xmin=102, xmax=104, in_progress=[102])\nprint(f\"snapshot: xmin={snap.xmin} xmax={snap.xmax} in_progress={sorted(snap.in_progress)}\\n\")\nfor tup in heap:\n    mark = \"VISIBLE\" if visible(tup, snap) else \"  ---  \"\n    print(f\"  [{mark}] {tup['label']}\")\n\nlive = [t for t in heap if visible(t, snap)]\nprint(f\"\\n{len(heap)} versions on the page, {len(live)} visible -> SELECT returns \"\n      f\"{len(live)} row. The other {len(heap) - len(live)} are VACUUM's problem.\")",
+      "explanation": "This is the actual rule, not an analogy: check `xmin` committed and in the past, then let `xmax` overrule it. Four physical versions of one logical row — the shape an UPDATE, a concurrent write and a rollback leave behind — and exactly one survives. Change the snapshot to `Snapshot(xmin=104, xmax=105, in_progress=[])` and run it again: transaction 102 has now committed in your past, and a different version wins."
+    },
+    {
+      "type": "code",
+      "title": "The same thing, from psql",
+      "language": "sql",
+      "code": "-- Every table has hidden system columns. Ask for them explicitly.\nSELECT ctid, xmin, xmax, * FROM accounts WHERE id = 1;\n--  ctid  | xmin | xmax | id | balance\n-- (0,1)  |  742 |    0 |  1 |    100\n\nBEGIN;\nUPDATE accounts SET balance = 150 WHERE id = 1;\n\n-- Same logical row, new ctid: a second physical version now exists.\nSELECT ctid, xmin, xmax, * FROM accounts WHERE id = 1;\n--  ctid  | xmin | xmax | id | balance\n-- (0,2)  |  743 |    0 |  1 |    150\nCOMMIT;\n\n-- Both versions are still on the page. Prove it:\nCREATE EXTENSION IF NOT EXISTS pageinspect;\nSELECT lp, lp_off, t_xmin, t_xmax, t_ctid\nFROM   heap_page_items(get_raw_page('accounts', 0));\n--  lp | lp_off | t_xmin | t_xmax | t_ctid\n--   1 |   8152 |    742 |    743 | (0,2)     <- superseded, points at its successor\n--   2 |   8112 |    743 |      0 | (0,2)     <- current\n\n-- How much of the table is dead weight right now:\nSELECT relname, n_live_tup, n_dead_tup, last_autovacuum\nFROM   pg_stat_user_tables\nORDER  BY n_dead_tup DESC\nLIMIT  10;",
+      "explanation": "`pageinspect` is the honest way to check your mental model — it shows the raw line pointers and tuple headers of a page. The old version's `t_ctid` pointing at `(0,2)` is the update chain that lets a concurrent transaction follow a row forward."
+    },
+    {
+      "type": "diagram",
+      "title": "What COMMIT actually waits for",
+      "mermaid": "sequenceDiagram\n  participant B as Backend\n  participant S as shared_buffers\n  participant W as WAL buffer\n  participant D as pg_wal on disk\n  participant H as Heap on disk\n  B->>S: modify page in memory\n  B->>W: append WAL record\n  Note over B,W: page is dirty, heap on disk is stale\n  B->>D: COMMIT - fsync the WAL\n  D-->>B: durable\n  Note over B: client is told COMMIT succeeded here\n  S-->>H: checkpointer flushes the page, later\n  Note over S,H: if we crash before this, recovery replays the WAL",
+      "caption": "Commit is an fsync of the log, not of your table. The heap page may reach disk minutes later — or never, if the page is dirtied again first."
+    },
+    {
+      "type": "concept",
+      "title": "WAL: write the log before the data",
+      "tagline": "One rule, from which durability, replication and PITR all follow.",
+      "markdown": "The **write-ahead rule**: a change must be described in the log, and that log flushed to durable storage, *before* the modified data page may be written.\n\nSo `COMMIT` means **the WAL record is on disk**. Your table's pages are still dirty in `shared_buffers`. This is why Postgres commits fast: it turns scattered random writes across many pages into one sequential append plus one `fsync`.\n\n### LSNs\n\nEvery WAL record has a **log sequence number** — its byte offset in a conceptually infinite stream. Every page stores the LSN of the last record that modified it. Recovery compares the two: if a page's LSN is already at or beyond the record being replayed, that change is already there and gets skipped. That comparison is what makes replay **idempotent**, and therefore safe to crash in the middle of.\n\n### Full page writes\n\nThe first time a page is modified after a checkpoint, its **entire 8 KB image** goes into the WAL, not just the delta.\n\nThe reason is torn pages. Your storage promises atomicity at its own sector size, not at 8 KB. Lose power mid-write and a page can land half old, half new — internally inconsistent in a way no delta record can repair, because a delta assumes a known starting state. A full image assumes nothing.\n\nThis is why WAL volume **spikes immediately after every checkpoint** and tapers off until the next one, and why checkpointing too often can cost more in write amplification than it saves in recovery time.\n\n### The same log, three products\n\nCrash recovery replays it locally. **PITR** archives it and replays to a chosen moment. **Streaming replication** ships it to another server that replays it continuously. A replica is not a special mode — it is a server permanently in recovery, reading someone else's log."
+    },
+    {
+      "type": "concept",
+      "title": "Checkpoints and crash recovery",
+      "tagline": "A checkpoint is a promise about how far back recovery must read.",
+      "markdown": "A **checkpoint** flushes every dirty buffer to disk, then writes a checkpoint record containing the **redo point** — the LSN where recovery must begin. Everything before it is known durable.\n\n### Recovery, in three steps\n\n1. Read the control file, find the last checkpoint record, take its redo point.\n2. Replay WAL forward from there. Each record either applies to its page or is skipped    because the page's LSN shows it already landed.\n3. Restore any torn page from the full-page image the log is guaranteed to hold.\n\nThat is the whole algorithm. There is no undo pass — MVCC means an aborted transaction's rows simply never become visible, so there is nothing to roll back at recovery time.\n\n### The tuning tension\n\n`checkpoint_timeout` and `max_wal_size` decide how often checkpoints run, and the trade is direct:\n\n- **Frequent checkpoints** — fast recovery, but more full page writes and repeated flushing of   the same hot pages.\n- **Rare checkpoints** — less write amplification, but more WAL to replay after a crash, and a   larger burst of dirty pages when the checkpoint finally lands.\n\n`checkpoint_completion_target` spreads the flushing across the interval rather than dumping it at the end, which is what keeps a checkpoint from showing up as a latency cliff. Watch `pg_stat_checkpointer`: checkpoints triggered by WAL volume rather than by time mean `max_wal_size` is too small for the workload."
+    },
+    {
+      "type": "concept",
+      "title": "VACUUM, freezing, and the wraparound clock",
+      "tagline": "Cleanup is not housekeeping — it is a correctness requirement on a timer.",
+      "markdown": "VACUUM does three separate jobs, and it is worth keeping them apart:\n\n1. **Reclaim dead tuples.** Plain VACUUM marks their space reusable *within the page*. It does    not return space to the operating system — only `VACUUM FULL` does, by rewriting the whole    table under an `ACCESS EXCLUSIVE` lock.\n2. **Maintain the visibility map**, marking pages where every tuple is visible to everyone.    Index-only scans depend entirely on this.\n3. **Freeze old rows** — and this one is not optional.\n\n### Autovacuum's trigger\n\nRoughly `50 + 0.2 × reltuples` changed rows. A 1,000-row table is vacuumed after ~250 changes; a 100-million-row table waits for **20 million**. The scale factor is why large tables are almost always under-vacuumed at default settings — lowering `autovacuum_vacuum_scale_factor` for big tables is one of the highest-value knobs in Postgres.\n\n### Wraparound\n\nA transaction ID is **32 bits**. Postgres distinguishes past from future by *age*, comparing modulo 2³², so only about **2³¹ ≈ 2.1 billion** transactions of that space are usable at once. Let an unfrozen row get older than that and the arithmetic inverts: its `xmin` starts looking like it is in the *future*, and the row **disappears**.\n\nFreezing is the defence. VACUUM stamps sufficiently old rows as unconditionally visible, retiring their XID from the comparison entirely. If freezing falls far enough behind, the server starts warning, then refuses to assign new XIDs at all — it stops accepting writes to protect your data from silently vanishing.\n\nMonitor it with one query and never be surprised:\n\n```sql\nSELECT relname, age(relfrozenxid) AS xid_age\nFROM   pg_class WHERE relkind = 'r'\nORDER  BY xid_age DESC LIMIT 10;\n```"
+    },
+    {
+      "type": "chart",
+      "title": "The wraparound clock is faster than it looks",
+      "chart": "line",
+      "xLabel": "days of uptime",
+      "yLabel": "transaction IDs consumed (millions)",
+      "caption": "Arithmetic, not measurement: transaction rate × 86,400 × days. The flat line is the ~2.1 billion (2³¹) usable XID space. Where a workload line crosses it is when unfrozen rows would start reading as future rows — so freezing has to have finished before then.",
+      "series": [
+        {
+          "name": "200 txn/s",
+          "points": [
+            {
+              "x": 0,
+              "y": 0.0
+            },
+            {
+              "x": 5,
+              "y": 86.4
+            },
+            {
+              "x": 10,
+              "y": 172.8
+            },
+            {
+              "x": 15,
+              "y": 259.2
+            },
+            {
+              "x": 20,
+              "y": 345.6
+            },
+            {
+              "x": 25,
+              "y": 432.0
+            },
+            {
+              "x": 30,
+              "y": 518.4
+            }
+          ]
+        },
+        {
+          "name": "1,000 txn/s",
+          "points": [
+            {
+              "x": 0,
+              "y": 0.0
+            },
+            {
+              "x": 5,
+              "y": 432.0
+            },
+            {
+              "x": 10,
+              "y": 864.0
+            },
+            {
+              "x": 15,
+              "y": 1296.0
+            },
+            {
+              "x": 20,
+              "y": 1728.0
+            },
+            {
+              "x": 25,
+              "y": 2160.0
+            },
+            {
+              "x": 30,
+              "y": 2592.0
+            }
+          ]
+        },
+        {
+          "name": "3,000 txn/s",
+          "points": [
+            {
+              "x": 0,
+              "y": 0.0
+            },
+            {
+              "x": 5,
+              "y": 1296.0
+            },
+            {
+              "x": 10,
+              "y": 2592.0
+            },
+            {
+              "x": 15,
+              "y": 3888.0
+            },
+            {
+              "x": 20,
+              "y": 5184.0
+            },
+            {
+              "x": 25,
+              "y": 6480.0
+            },
+            {
+              "x": 30,
+              "y": 7776.0
+            }
+          ]
+        },
+        {
+          "name": "wraparound budget (2³¹)",
+          "points": [
+            {
+              "x": 0,
+              "y": 2147.5
+            },
+            {
+              "x": 5,
+              "y": 2147.5
+            },
+            {
+              "x": 10,
+              "y": 2147.5
+            },
+            {
+              "x": 15,
+              "y": 2147.5
+            },
+            {
+              "x": 20,
+              "y": 2147.5
+            },
+            {
+              "x": 25,
+              "y": 2147.5
+            },
+            {
+              "x": 30,
+              "y": 2147.5
+            }
+          ]
+        }
+      ],
+      "markdown": "A busy OLTP box at 3,000 transactions per second burns through the entire usable transaction ID space in **about eight days**. At 1,000/s it takes about 25. This is why autovacuum's freezing work is not something you can defer indefinitely on a large, hot table — and why `age(relfrozenxid)` belongs on your dashboard next to disk space."
+    },
+    {
+      "type": "diagram",
+      "title": "Clock sweep: choosing a victim",
+      "mermaid": "flowchart TD\n  START[\"Need a free buffer\"] --> HAND[\"Look at buffer under the clock hand\"]\n  HAND --> PIN{\"Pinned?\"}\n  PIN -->|\"yes - someone is using it\"| NEXT[\"Advance the hand\"]\n  PIN -->|\"no\"| USE{\"usage_count greater than 0?\"}\n  USE -->|\"yes\"| DEC[\"Decrement usage_count\"] --> NEXT\n  USE -->|\"no\"| DIRTY{\"Dirty?\"}\n  DIRTY -->|\"yes\"| FLUSH[\"Flush WAL, then write the page\"] --> EVICT\n  DIRTY -->|\"no\"| EVICT[\"Evict and reuse the frame\"]\n  NEXT --> HAND",
+      "caption": "Not LRU — an approximation of it that needs no ordering and no list surgery on every access, which matters when dozens of processes touch the same array concurrently."
+    },
+    {
+      "type": "concept",
+      "title": "The buffer manager",
+      "tagline": "A fixed array of 8 KB frames, an approximation of LRU, and one rule it can never break.",
+      "markdown": "`shared_buffers` is an array of page-sized frames plus, for each, a **`BufferDesc`** holding a reference count, a usage count and flags (dirty, valid, locked).\n\n**Pinning.** `ReadBuffer()` increments the reference count, making the frame ineligible for eviction while someone is reading it; `ReleaseBuffer()` drops it. A pin is not a lock — two backends can pin the same buffer at once. Content locking is separate and finer-grained.\n\n**Clock sweep.** Rather than maintaining true LRU order, a hand rotates over the array. At each frame: pinned → skip; usage count above zero → decrement and move on; zero → this is the victim. Frequently touched pages keep getting their count bumped back up on access, so they survive several revolutions. It is an approximation of LRU that costs one atomic decrement instead of moving a node in a shared list — which is the difference that matters when many processes hit the array concurrently.\n\n**And the rule it cannot break:** if the victim is dirty, its WAL must be flushed before the page is written. Write-ahead logging is not just a commit-path concern — it constrains eviction too.\n\n### Ring buffers\n\nA sequential scan of a table larger than the cache would otherwise evict everything for pages it will never revisit. So large scans, `COPY`, and VACUUM use a small **ring** of frames (hundreds of kilobytes) and recycle it, leaving the rest of the cache alone. Your OLTP working set survives an analyst's full-table scan because of this, not by luck.\n\n### Double caching\n\nPostgres reads through the OS page cache and does not use direct I/O, so a hot page often exists **twice** in RAM. That is the reason for the folklore that `shared_buffers` should be around 25% of memory rather than most of it — you are deliberately leaving room for the kernel cache underneath. `pg_buffercache` will show you what is actually resident."
+    },
+    {
+      "type": "diagram",
+      "title": "The life of a query",
+      "mermaid": "flowchart LR\n  SQL[\"SQL text\"] --> P[\"Parser<br/>syntax to raw parse tree\"]\n  P --> A[\"Analyzer<br/>resolve names via catalogs\"]\n  A --> R[\"Rewriter<br/>expand views and rules\"]\n  R --> PL[\"Planner<br/>enumerate paths, cost them\"]\n  PL --> E[\"Executor<br/>volcano - pull next tuple\"]\n  E --> OUT[\"Rows\"]\n  STATS[\"pg_statistic<br/>from ANALYZE\"] --> PL\n  PL -.->|\"more than geqo_threshold tables\"| G[\"GEQO<br/>genetic search\"]\n  G -.-> E",
+      "caption": "Four stages. The planner is the only one that makes a judgement call — and it makes it from statistics, which is where plans go wrong."
+    },
+    {
+      "type": "concept",
+      "title": "Planner and executor",
+      "tagline": "Cost-based search over plan shapes, then one uniform interface: give me the next tuple.",
+      "markdown": "### Planning\n\nThe planner builds **paths** — candidate ways to produce a result — and costs each one. For join ordering it does bottom-up dynamic programming: best path for each single relation, then each pair, and so on. That is exponential, so above **`geqo_threshold`** (default 12 `FROM` items) it hands over to **GEQO**, a genetic algorithm that samples the space instead of covering it. GEQO is not deterministic — the same query can get different plans on different runs, which is worth knowing before you spend an afternoon confused by it.\n\nCosts are unitless, anchored to sequential I/O:\n\n| Constant | Default | Meaning |\n|---|---|---|\n| `seq_page_cost` | 1.0 | one page fetched sequentially |\n| `random_page_cost` | 4.0 | one page fetched randomly |\n| `cpu_tuple_cost` | 0.01 | processing one row |\n| `cpu_index_tuple_cost` | 0.005 | processing one index entry |\n| `cpu_operator_cost` | 0.0025 | one operator or function call |\n\nThat 4:1 random-to-sequential ratio was calibrated for spinning disks. On NVMe it is simply wrong, and leaving it there systematically biases the planner **away from index scans** — lowering `random_page_cost` to 1.1 is the single most common correct tuning change on modern storage.\n\n### Why plans actually go wrong\n\nAlmost never the cost model. Almost always **cardinality estimation**. The planner estimates row counts from `pg_statistic` — histograms, most-common-value lists, and per-column distinct counts collected by `ANALYZE`. Critically, it assumes **columns are independent**. Given `WHERE city = 'Paris' AND country = 'France'` it multiplies two selectivities and predicts far fewer rows than exist, then picks a nested loop that is catastrophic at the real row count. `CREATE STATISTICS` exists precisely to teach it about correlated columns.\n\n### Execution\n\nThe executor walks the plan as a tree of nodes in the **volcano / iterator** model: every node implements the same call — *give me the next tuple* — and pulls from its children. A sort node pulls everything before returning anything; a nested loop pulls one row from the outer side then rescans the inner. That single uniform interface is why arbitrarily complex plans compose from about forty node types, and why `EXPLAIN ANALYZE` can report `loops=N` on an inner node: you are seeing it restarted once per outer row."
+    },
+    {
+      "type": "code",
+      "title": "Reading a plan like the planner wrote it",
+      "language": "sql",
+      "code": "EXPLAIN (ANALYZE, BUFFERS, COSTS)\nSELECT o.id, o.total\nFROM   orders o JOIN customers c ON c.id = o.customer_id\nWHERE  c.country = 'FR' AND o.created_at >= now() - interval '7 days';\n\n-- Nested Loop  (cost=0.71..2140.55 rows=12 width=12)\n--               (actual time=0.042..91.318 rows=48213 loops=1)\n--   Buffers: shared hit=1428 read=38104\n--   ->  Index Scan using customers_country_idx on customers c\n--         (cost=0.29..18.4 rows=9 width=4) (actual rows=8422 loops=1)\n--   ->  Index Scan using orders_customer_id_idx on orders o\n--         (cost=0.42..235.6 rows=1 width=12) (actual rows=6 loops=8422)\n\n-- Read it as three questions:\n--   1. rows=12 estimated vs rows=48213 actual -> the estimate is off by 4000x.\n--      Everything below is a consequence, not a separate problem.\n--   2. loops=8422 -> the inner side was restarted 8422 times. A nested loop is\n--      only correct when the outer side is tiny; the planner thought it was 9.\n--   3. read=38104 -> pages that missed shared_buffers and went to the OS.\n\n-- Why the estimate was wrong: country and customer activity are correlated,\n-- and the planner assumes independence. Teach it otherwise:\nCREATE STATISTICS orders_cust_stats (dependencies)\n  ON customer_id, created_at FROM orders;\nANALYZE orders;",
+      "explanation": "`BUFFERS` is the option most people never turn on and should always use — it separates \"this plan is slow because it is doing too much work\" from \"this plan is slow because it is missing the cache.\" The habit worth building: compare `rows=` estimated against `rows=` actual **first**, before looking at timings. A plan is rarely bad; an estimate usually is."
+    },
+    {
+      "type": "concept",
+      "title": "Access methods, and what index-only really requires",
+      "tagline": "Five index types, each answering a different shape of question.",
+      "markdown": "| Type | Answers | Cost |\n|---|---|---|\n| **B-tree** | `=`, `<`, `>`, `BETWEEN`, prefix `LIKE`, and `ORDER BY` for free | the default; well-behaved |\n| **Hash** | equality only | smaller than B-tree, but no ordering, no range |\n| **GiST** | \"contains / overlaps / is near\" — geometry, ranges, k-NN | lossy: matches must be rechecked against the heap |\n| **GIN** | membership inside a value — arrays, `JSONB`, full-text | large, slow to update, unbeatable for containment |\n| **BRIN** | \"which block ranges could hold this value\" | tiny — kilobytes for a huge table — but only if physical order correlates |\n\nBRIN is the one worth knowing about: on an append-only table of timestamped events, a BRIN index on the timestamp can be **thousands of times smaller** than the B-tree and nearly as effective, because rows arrive in roughly the order it summarizes. Shuffle that correlation and it degrades to useless.\n\n### Index-only scans are not free\n\nAn index entry carries no visibility information — `xmin`/`xmax` live in the **heap** tuple. So even when an index contains every column a query needs, Postgres must normally visit the heap just to ask \"is this row visible to me?\"\n\nThe **visibility map** is the way out: one bit per heap page saying *every tuple on this page is visible to every transaction*. When the bit is set, the heap fetch is skipped. That bit is set by **VACUUM**.\n\nWhich produces a genuinely counter-intuitive result: **an index-only scan's performance depends on how recently you vacuumed.** A well-designed covering index on a table autovacuum has fallen behind on will still hit the heap for every row, and `EXPLAIN` will tell you so as `Heap Fetches: 48213`. If that number is large, the fix is vacuum, not the index."
+    },
+    {
+      "type": "chart",
+      "title": "Why a B-tree lookup costs the same at any scale",
+      "chart": "bar",
+      "yLabel": "index levels to reach a leaf",
+      "caption": "Derived, not measured: ⌈log₍₂₀₀₎ N⌉, taking ~200 entries per 8 KB internal page for a typical integer key. The point is the shape — a thousandfold more rows costs one extra page read.",
+      "categories": [
+        "10 thousand",
+        "1 million",
+        "100 million",
+        "10 billion"
+      ],
+      "series": [
+        {
+          "name": "B-tree height",
+          "values": [
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      ],
+      "markdown": "An 8 KB page holds on the order of 200 keys plus pointers, so each level multiplies the addressable rows by ~200. Going from ten thousand rows to ten *billion* — a factor of a million — costs **three extra page reads**, and the top levels are almost always cached. This is why \"add an index\" scales so well, and why the interesting cost of an index is never the lookup — it is the write amplification on every INSERT and non-HOT UPDATE."
+    },
+    {
+      "type": "note",
+      "title": "Locking: three different mechanisms with confusingly similar names",
+      "markdown": "**Heavyweight locks** (the lock manager) guard tables and other objects. Eight modes, held to end of transaction, tracked in a shared hash table, and the only ones that participate in deadlock detection. `ALTER TABLE` taking `ACCESS EXCLUSIVE` is why a schema migration can stall an entire application — and why it queues *behind* a long-running `SELECT` while everything else queues behind **it**.\n\n**Lightweight locks (LWLocks)** guard shared-memory structures — buffer headers, WAL buffers, the commit log. Shared or exclusive, held for microseconds, and with **no deadlock detection**: safety comes from every code path taking them in the same fixed order. When you see `LWLock` in `pg_stat_activity.wait_event`, you are looking at internal contention, not application-level lock conflict.\n\n**Row locks** live in the **tuple header itself**, not in a lock table. That is why Postgres can lock ten million rows without exhausting shared memory — a distinction from engines that escalate row locks to table locks under pressure. Four modes: `FOR KEY SHARE`, `FOR SHARE`, `FOR NO KEY UPDATE`, `FOR UPDATE`.\n\n**Deadlock detection is lazy.** No one is watching continuously. A transaction that has been waiting `deadlock_timeout` (1 second by default) wakes up and searches the wait-for graph for a cycle. So a deadlock always costs at least a second before anyone is aborted — and setting that timeout very low to \"detect faster\" instead burns CPU on graph searches during ordinary lock waits."
+    },
+    {
+      "type": "note",
+      "title": "Reading the source, and where the truth actually lives",
+      "markdown": "Postgres is unusually approachable for a database engine, largely because the important directories carry `README` files that explain the design before you read a line of C.\n\n- `src/backend/storage/buffer/README` — buffer manager, clock sweep, ring buffers\n- `src/backend/storage/lmgr/README` — the lock manager and deadlock detection\n- `src/backend/access/nbtree/README` — the B-tree implementation, including concurrency\n- `src/backend/access/transam/README` — transactions, WAL, commit\n- `src/backend/optimizer/README` — how paths are built and costed\n\nStart with the README, then the header file, then the `.c`. The commit messages are also unusually good — `git log --follow` on a file you care about is a readable history of why the design is the way it is.\n\nOne habit that shortcuts a lot of guessing: **`pg_stat_activity.wait_event_type` and `wait_event` name the exact internal thing a backend is blocked on** — a specific LWLock, a buffer pin, an I/O. That column is the bridge from \"the database is slow\" to a named subsystem in the source tree."
+    },
+    {
+      "type": "diagram",
+      "title": "The whole territory",
+      "mermaid": "mindmap\n  root((Postgres internals))\n    Processes\n      postmaster\n      backend per connection\n      checkpointer\n      autovacuum\n    Storage\n      8 KB pages\n      line pointers\n      tuple headers\n      TOAST\n    Concurrency\n      xmin and xmax\n      snapshots\n      HOT updates\n      row locks in the tuple\n    Durability\n      write-ahead rule\n      LSNs\n      full page writes\n      checkpoints\n    Maintenance\n      dead tuples\n      freezing\n      wraparound\n      visibility map\n    Memory\n      shared_buffers\n      clock sweep\n      ring buffers\n    Query\n      parser\n      rewriter\n      cost-based planner\n      volcano executor\n    Access methods\n      B-tree\n      GIN and GiST\n      BRIN\n      index-only scans",
+      "caption": "Eight subsystems. Every arrow you could draw between them ends up passing through either the page or the log."
+    },
+    {
+      "type": "glossary",
+      "title": "The vocabulary",
+      "entries": [
+        {
+          "term": "XID",
+          "definition": "Transaction ID. A 32-bit counter; only ~2³¹ of its space is usable at once, which is what makes freezing mandatory."
+        },
+        {
+          "term": "ctid",
+          "definition": "A tuple's physical address: (block number, line pointer index). Changes on every non-HOT update, which is why it is not a stable row identity."
+        },
+        {
+          "term": "LSN",
+          "definition": "Log sequence number — a byte position in the WAL stream. Stamped on every page, which is what makes replay idempotent."
+        },
+        {
+          "term": "Line pointer (ItemId)",
+          "definition": "A 4-byte slot in a page's array pointing at a tuple. The indirection that lets tuples move without touching indexes."
+        },
+        {
+          "term": "HOT update",
+          "definition": "Heap-Only Tuple update: the new version fits on the same page and changed no indexed column, so no index is modified."
+        },
+        {
+          "term": "Hint bits",
+          "definition": "Cached commit status written back into a tuple's info-mask by the first reader after commit — why a pure SELECT can generate write I/O."
+        },
+        {
+          "term": "xmin horizon",
+          "definition": "The oldest snapshot still in use across the cluster. VACUUM cannot remove anything newer, so one idle open transaction blocks all cleanup."
+        },
+        {
+          "term": "Visibility map",
+          "definition": "One bit per heap page: 'every tuple here is visible to everyone.' Set by VACUUM; index-only scans are impossible without it."
+        },
+        {
+          "term": "Free space map",
+          "definition": "A per-relation fork tracking free space per page, so an INSERT can find a page with room without scanning."
+        },
+        {
+          "term": "TOAST",
+          "definition": "The Oversized-Attribute Storage Technique: compresses and slices values too large to fit a page into a side table."
+        },
+        {
+          "term": "Fork",
+          "definition": "An auxiliary file alongside a relation's main data file — the visibility map and free space map are forks."
+        },
+        {
+          "term": "Redo point",
+          "definition": "The LSN recorded in a checkpoint where crash recovery must begin replaying."
+        },
+        {
+          "term": "Clock sweep",
+          "definition": "The buffer eviction algorithm: a rotating hand decrements usage counts and takes the first unpinned buffer at zero."
+        },
+        {
+          "term": "GEQO",
+          "definition": "Genetic Query Optimizer — the sampling join-order search used above geqo_threshold (12) FROM items. Non-deterministic."
+        },
+        {
+          "term": "Volcano model",
+          "definition": "The executor's design: every plan node exposes one operation, 'next tuple', and pulls from its children."
+        }
+      ]
+    },
+    {
+      "type": "video",
+      "title": "MVCC Unmasked",
+      "videoId": "KVEfxb5lid8",
+      "channel": "Bruce Momjian (EnterpriseDB)",
+      "reason": "Momjian is a core team member and has been explaining MVCC longer than most Postgres users have been using it. This is the canonical talk on the subject — go here after the MVCC concept above, not before."
+    },
+    {
+      "type": "video",
+      "title": "Explaining the Postgres Query Optimizer",
+      "videoId": "P5iZri9s0WQ",
+      "channel": "Bruce Momjian",
+      "reason": "Walks the optimizer's decisions with real plans — the companion to the cost-model section, showing where estimates come from and how they go wrong."
+    },
+    {
+      "type": "video",
+      "title": "Understanding PostgreSQL Query Plans (EXPLAIN)",
+      "videoId": "ymVGg6woUtc",
+      "channel": "Stephen Frost — PGConf NYC 2022",
+      "reason": "The practical counterpart: reading EXPLAIN output line by line and knowing which number to look at first."
+    },
+    {
+      "type": "video",
+      "title": "A Deep Dive into PostgreSQL Indexing",
+      "videoId": "3rQZpq_HXhY",
+      "channel": "PGConf NYC 2022",
+      "reason": "Covers the access methods in more depth than any single article, including when the non-B-tree types actually earn their place."
+    },
+    {
+      "type": "video",
+      "title": "A Deep Dive into Postgres Statistics",
+      "videoId": "ApAClPFJ_rU",
+      "channel": "Louise Grandjonc — PGConf.EU 2024",
+      "reason": "Statistics are where plans are really decided. This goes into pg_statistic itself — histograms, MCVs, and extended statistics for correlated columns."
+    },
+    {
+      "type": "resource",
+      "title": "The Internals of PostgreSQL",
+      "url": "https://www.interdb.jp/pg/",
+      "source": "Hironobu Suzuki",
+      "description": "The best free book on this subject, and the one to read next. Chapter-per-subsystem with diagrams at the right level of detail — buffer manager, WAL, VACUUM, concurrency control. Start at chapter 1 and work forward."
+    },
+    {
+      "type": "resource",
+      "title": "PostgreSQL 14 Internals",
+      "url": "https://postgrespro.com/community/books/internals",
+      "source": "Egor Rogov, Postgres Professional",
+      "description": "A full-length book, free as a PDF, and more current and more thorough than anything else available. If you only read one long thing after this board, read this."
+    },
+    {
+      "type": "resource",
+      "title": "Database Page Layout — official documentation",
+      "url": "https://www.postgresql.org/docs/current/storage-page-layout.html",
+      "source": "PostgreSQL documentation",
+      "description": "The authoritative byte-level layout: PageHeaderData, ItemIdData, HeapTupleHeaderData, and the TOAST pointer. Short, and the ground truth for everything in the storage section above."
+    },
+    {
+      "type": "resource",
+      "title": "WAL Configuration — official documentation",
+      "url": "https://www.postgresql.org/docs/current/wal-configuration.html",
+      "source": "PostgreSQL documentation",
+      "description": "How checkpoints, full page writes and WAL sizing actually interact, from the source of truth. Read alongside the checkpoint section above before tuning anything."
+    },
+    {
+      "type": "resource",
+      "title": "Routine Vacuuming — official documentation",
+      "url": "https://www.postgresql.org/docs/current/routine-vacuuming.html",
+      "source": "PostgreSQL documentation",
+      "description": "The definitive treatment of dead tuples, freezing and wraparound prevention, including the exact autovacuum threshold formula and what the emergency modes do."
+    },
+    {
+      "type": "resource",
+      "title": "MVCC Unmasked (slides)",
+      "url": "https://momjian.us/main/writings/pgsql/mvcc.pdf",
+      "source": "Bruce Momjian",
+      "description": "The slide deck behind the talk — worth having open alongside it, because the tuple-header diagrams are the clearest published version of the visibility rule."
+    },
+    {
+      "type": "resource",
+      "title": "postgres/src/backend/storage/lmgr/README",
+      "url": "https://github.com/postgres/postgres/blob/master/src/backend/storage/lmgr/README",
+      "source": "PostgreSQL source",
+      "description": "The lock manager explained by the people who wrote it: lock modes, the shared hash table, and the deadlock detection algorithm. A good first taste of how readable this codebase is."
+    },
+    {
+      "type": "resource",
+      "title": "Index-only scans",
+      "url": "https://wiki.postgresql.org/wiki/Index-only_scans",
+      "source": "PostgreSQL Wiki",
+      "description": "Why the visibility map exists and what it costs, from the developers who implemented index-only scans. The clearest explanation of the vacuum-to-index-performance link."
+    }
+  ],
+  "sources": [
+    {
+      "title": "The Internals of PostgreSQL — Hironobu Suzuki",
+      "url": "https://www.interdb.jp/pg/"
+    },
+    {
+      "title": "Database Page Layout — PostgreSQL docs",
+      "url": "https://www.postgresql.org/docs/current/storage-page-layout.html"
+    },
+    {
+      "title": "WAL Configuration — PostgreSQL docs",
+      "url": "https://www.postgresql.org/docs/current/wal-configuration.html"
+    },
+    {
+      "title": "Routine Vacuuming — PostgreSQL docs",
+      "url": "https://www.postgresql.org/docs/current/routine-vacuuming.html"
+    },
+    {
+      "title": "Query Planning — PostgreSQL docs",
+      "url": "https://www.postgresql.org/docs/current/runtime-config-query.html"
+    },
+    {
+      "title": "Index Types — PostgreSQL docs",
+      "url": "https://www.postgresql.org/docs/current/indexes-types.html"
+    },
+    {
+      "title": "Explicit Locking — PostgreSQL docs",
+      "url": "https://www.postgresql.org/docs/current/explicit-locking.html"
+    },
+    {
+      "title": "How the Buffer Manager Works — InterDB",
+      "url": "https://www.interdb.jp/pg/pgsql08/04.html"
+    },
+    {
+      "title": "Postgres Internals Deep Dive: Process Architecture — EDB",
+      "url": "https://www.enterprisedb.com/blog/postgres-internals-deep-dive-process-architecture"
+    },
+    {
+      "title": "PostgreSQL MVCC, Byte by Byte — boringSQL",
+      "url": "https://boringsql.com/posts/postgresql-mvcc-byte-by-byte/"
+    },
+    {
+      "title": "Inside PostgreSQL's 8KB Page — boringSQL",
+      "url": "https://boringsql.com/posts/inside-the-8kb-page/"
+    },
+    {
+      "title": "Index-only scans — PostgreSQL Wiki",
+      "url": "https://wiki.postgresql.org/wiki/Index-only_scans"
+    },
+    {
+      "title": "postgres/src/backend/storage/buffer — source",
+      "url": "https://github.com/postgres/postgres/tree/master/src/backend/storage/buffer"
+    },
+    {
+      "title": "PostgreSQL locking, part 2: heavyweight locks — Percona",
+      "url": "https://www.percona.com/blog/postgresql-locking-part-2-heavyweight-locks/"
+    }
+  ]
+}
