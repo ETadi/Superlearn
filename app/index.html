@@ -95,6 +95,24 @@
     --shadow-card: 0 10px 30px -16px rgba(20, 50, 90, .28);
   }
 
+  /* ══════════════════════════════════════════════════════════════════
+     Categorical series colors. Fixed order, never cycled. These are the
+     validated reference palette's two selected columns — the dark column
+     for dark themes, the light column for light ones — checked with the
+     palette validator against every one of the six card surfaces
+     (lightness band, chroma floor, adjacent-pair CVD ΔE, normal-vision
+     floor, contrast). Light surfaces WARN on contrast for some slots,
+     which is why every chart ships a table view and direct labels.
+     ══════════════════════════════════════════════════════════════════ */
+  [data-theme="midnight"], [data-theme="blueprint"], [data-theme="terminal"] {
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --s4: #c98500; --s5: #d55181; --s6: #008300;
+  }
+  [data-theme="paper"], [data-theme="sepia"], [data-theme="arctic"] {
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+    --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background-color: var(--ink-950);
@@ -277,7 +295,96 @@
   /* ── Diagram ────────────────────────────────────────── */
   .mermaid-host { display: flex; justify-content: center; padding: 6px 0; overflow-x: auto; }
   .mermaid-host svg { max-width: 100%; height: auto; }
+  .mermaid-host.zoomable { cursor: zoom-in; }
   .diagram-caption { text-align: center; font-size: 12.5px; color: var(--ink-400); margin-top: 8px; font-style: italic; }
+
+  /* ── Math (KaTeX) ───────────────────────────────────── */
+  .tex { font-family: var(--font-mono); font-size: .95em; color: var(--ink-100); }
+  .tex[data-display="1"] { display: block; text-align: center; margin: 10px 0; overflow-x: auto; }
+  .tex .katex { font-size: 1.05em; }
+  .tex[data-display="1"] .katex-display { margin: 0; }
+  .tex.tex-raw { color: var(--sky); background: var(--ink-950); border: 1px solid var(--ink-800);
+                 border-radius: 6px; padding: 1px 6px; }
+
+  /* ── Images ─────────────────────────────────────────── */
+  .figure { margin: 0; }
+  .figure img {
+    width: 100%; height: auto; display: block; border-radius: 12px;
+    border: 1px solid var(--ink-800); background: var(--ink-950); cursor: zoom-in;
+  }
+  .figure figcaption { font-size: 12.5px; color: var(--ink-400); margin-top: 8px; line-height: 1.5; }
+  .figure .credit { display: block; font-size: 11px; color: var(--ink-600); margin-top: 4px; }
+  .figure .broken {
+    display: grid; place-items: center; min-height: 120px; border-radius: 12px;
+    border: 1px dashed var(--ink-700); color: var(--ink-400); font-size: 12.5px; padding: 16px; text-align: center;
+  }
+
+  /* ── Charts ─────────────────────────────────────────── */
+  .chart-wrap { position: relative; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart-grid line { stroke: var(--ink-800); stroke-width: 1; shape-rendering: crispEdges; }
+  .chart-axis line { stroke: var(--ink-700); stroke-width: 1; shape-rendering: crispEdges; }
+  .chart-tick { fill: var(--ink-400); font-size: 10.5px; }
+  .chart-axis-label { fill: var(--ink-400); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; }
+  .chart-vlabel { fill: var(--ink-300); font-size: 10.5px; font-weight: 600; }
+  .chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .chart-dot { stroke: var(--ink-850); stroke-width: 2; }
+  .chart-bar { rx: 4; }
+  .chart-hit { fill: transparent; cursor: crosshair; }
+  .chart-crosshair { stroke: var(--ink-600); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 12.5px; color: var(--ink-300); }
+  .chart-legend span.k { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .chart-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
+  .chart-caption { font-size: 12.5px; color: var(--ink-400); font-style: italic; line-height: 1.5; }
+  .chart-tabletoggle { font-size: 11px; padding: 3px 10px; border-radius: 7px; background: var(--ink-850);
+                       border: 1px solid var(--ink-700); color: var(--ink-300); white-space: nowrap; }
+  .chart-tabletoggle:hover { color: var(--ink-100); border-color: var(--accent); }
+  .chart-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  .chart-table th { text-align: left; color: var(--ink-100); border-bottom: 1px solid var(--ink-700); padding: 5px 8px; font-weight: 600; }
+  .chart-table td { border-bottom: 1px solid var(--ink-800); padding: 5px 8px; color: var(--ink-300); font-variant-numeric: tabular-nums; }
+  .chart-table td.num { text-align: right; }
+  .chart-tip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
+    background: var(--ink-950); border: 1px solid var(--ink-700); border-radius: 9px;
+    padding: 7px 10px; font-size: 12px; color: var(--ink-200); white-space: nowrap;
+    box-shadow: 0 8px 24px -10px rgba(0,0,0,.6); z-index: 5;
+  }
+  .chart-tip b { color: var(--ink-100); display: block; margin-bottom: 3px; }
+  .chart-tip .row { display: flex; align-items: center; gap: 6px; }
+  .chart-tip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .chart-tip .v { margin-left: auto; padding-left: 12px; font-variant-numeric: tabular-nums; color: var(--ink-100); }
+
+  /* ── Zoom / lightbox overlay ────────────────────────── */
+  .zoom-overlay {
+    position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--ink-950) 88%, transparent); backdrop-filter: blur(8px);
+  }
+  .zoom-overlay[hidden] { display: none; }
+  .zoom-stage { width: 92vw; height: 88vh; overflow: hidden; display: grid; place-items: center; cursor: grab; }
+  .zoom-stage.dragging { cursor: grabbing; }
+  /* Diagrams are drawn for the card surface — put that surface back under
+     them, or a dark diagram vanishes into the dimmed backdrop. */
+  .zoom-inner {
+    transform-origin: center center; transition: transform .06s linear;
+    background: var(--ink-900); border: 1px solid var(--ink-700);
+    border-radius: 16px; padding: 24px; display: grid; place-items: center;
+    box-shadow: 0 30px 90px -30px rgba(0,0,0,.7);
+  }
+  /* SVGs get explicit pixel dimensions from their viewBox in openZoom(); this
+     only bounds raster images, which already have an intrinsic size. */
+  .zoom-inner img { max-width: 82vw; max-height: 76vh; height: auto; width: auto; }
+  .zoom-inner svg { display: block; }
+  .zoom-inner img { border-radius: 6px; }
+  .zoom-bar {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; align-items: center;
+    background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 12px; padding: 6px;
+  }
+  .zoom-bar button { background: var(--ink-850); border: 1px solid var(--ink-700); color: var(--ink-200);
+                     border-radius: 8px; padding: 5px 12px; font-size: 13px; }
+  .zoom-bar button:hover { border-color: var(--accent); color: var(--ink-100); }
+  .zoom-bar .pct { font-size: 12px; color: var(--ink-400); min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
   .mindmap-note { text-align: center; color: var(--ink-400); font-size: 13px; margin-bottom: 16px; }
 
   /* ── Empty / picker states ──────────────────────────── */
@@ -464,6 +571,17 @@
   </div>
 </div>
 
+<div id="zoomOverlay" class="zoom-overlay no-print" hidden>
+  <div id="zoomStage" class="zoom-stage"><div id="zoomInner" class="zoom-inner"></div></div>
+  <div class="zoom-bar">
+    <button id="zoomOut" aria-label="Zoom out">−</button>
+    <span class="pct" id="zoomPct">100%</span>
+    <button id="zoomIn" aria-label="Zoom in">+</button>
+    <button id="zoomReset">Fit</button>
+    <button id="zoomClose" aria-label="Close">✕</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -558,16 +676,39 @@ function currentThemeIsDark() {
 
 /* ── Markdown (escape-first, so model output can't inject markup) ──── */
 
+/**
+ * Inline markdown → HTML. Escape-first, so board text can never inject
+ * markup. Code spans and math are lifted out *before* escaping (their
+ * contents aren't markdown) and put back at the end.
+ *
+ * Math syntax: `$$…$$` display, `\(…\)` inline, and `$…$` only when it
+ * contains a TeX-ish character — so prose like "costs $5 and $10" is left
+ * alone instead of being mangled into math.
+ */
 function mdInline(s) {
-  let out = esc(s);
-  out = out.replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`);
+  const held = [];
+  const hold = (html) => `\u0000H${held.push(html) - 1}\u0000`;
+  let src = String(s ?? "");
+
+  // 1. code spans (highest precedence — nothing inside is parsed)
+  src = src.replace(/`([^`]+)`/g, (_, c) => hold(`<code>${esc(c)}</code>`));
+
+  // 2. math
+  const mathSpan = (tex, display) =>
+    hold(`<span class="tex" data-display="${display ? 1 : 0}" data-tex="${esc(tex)}">${esc(tex)}</span>`);
+  src = src.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => mathSpan(tex.trim(), true));
+  src = src.replace(/\\\(([\s\S]+?)\\\)/g, (_, tex) => mathSpan(tex.trim(), false));
+  src = src.replace(/\$([^$\n]+?)\$/g, (m, tex) =>
+    /[\\^_{}]/.test(tex) ? mathSpan(tex.trim(), false) : m);
+
+  let out = esc(src);
   out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   out = out.replace(/(^|\W)\*([^*\n]+)\*(?=\W|$)/g, "$1<em>$2</em>");
   out = out.replace(
     /\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
-  return out;
+  return out.replace(/\u0000H(\d+)\u0000/g, (_, n) => held[+n]);
 }
 
 function md2html(src) {
@@ -584,6 +725,24 @@ function md2html(src) {
       while (i < lines.length && !lines[i].trim().startsWith("```")) buf.push(lines[i++]);
       i++;
       out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+      continue;
+    }
+
+    // Display math on its own lines: $$ … $$ (possibly multi-line)
+    if (line.trim().startsWith("$$")) {
+      const buf = [];
+      let first = line.trim().slice(2);
+      if (first.endsWith("$$") && first.length > 2) {
+        buf.push(first.slice(0, -2));
+        i++;
+      } else {
+        if (first) buf.push(first);
+        i++;
+        while (i < lines.length && !lines[i].trim().endsWith("$$")) buf.push(lines[i++]);
+        if (i < lines.length) { buf.push(lines[i].trim().replace(/\$\$$/, "")); i++; }
+      }
+      const tex = buf.join("\n").trim();
+      out.push(`<span class="tex" data-display="1" data-tex="${esc(tex)}">${esc(tex)}</span>`);
       continue;
     }
 
@@ -642,21 +801,79 @@ function md2html(src) {
 
 /* ── Mermaid (CDN, lazy, theme-aware, graceful fallback) ───────────── */
 
+/** Loads a script once. If the global is already present — because an
+    offline export inlined the bundle — it resolves immediately, no network. */
+function loadLib(globalName, src, cache) {
+  if (window[globalName]) return Promise.resolve(window[globalName]);
+  if (cache.p) return cache.p;
+  cache.p = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = () => (window[globalName] ? resolve(window[globalName]) : reject(new Error("no global")));
+    s.onerror = () => reject(new Error(`${globalName} load failed`));
+    document.head.appendChild(s);
+  });
+  return cache.p;
+}
+
 let mermaidLib = null;
-let mermaidLoading = null;
+const mermaidCache = {};
 let mermaidThemeKey = "";
 
 function loadMermaid() {
   if (mermaidLib) return Promise.resolve(mermaidLib);
-  if (mermaidLoading) return mermaidLoading;
-  mermaidLoading = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
-    s.onload = () => { mermaidLib = window.mermaid; resolve(mermaidLib); };
-    s.onerror = () => reject(new Error("mermaid load failed"));
-    document.head.appendChild(s);
-  });
-  return mermaidLoading;
+  return loadLib("mermaid", "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js", mermaidCache)
+    .then((m) => { mermaidLib = m; return m; });
+}
+
+/* ── Math (KaTeX, lazy — only if the board actually contains math) ─── */
+
+const katexCache = {};
+let katexCssRequested = false;
+
+function loadKatex() {
+  // `[data-katex]` also matches the <style> an offline export inlines, so a
+  // vendored build never reaches for the CDN.
+  if (!katexCssRequested && !document.querySelector("[data-katex]")) {
+    katexCssRequested = true;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css";
+    link.setAttribute("data-katex", "");
+    document.head.appendChild(link);
+  }
+  return loadLib("katex", "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js", katexCache);
+}
+
+/**
+ * Upgrades .tex placeholders into rendered math. Until (or unless) KaTeX
+ * arrives, the placeholder already shows the raw TeX, so an offline board
+ * stays readable instead of blank.
+ */
+function typesetMath(root = document) {
+  const nodes = [...root.querySelectorAll(".tex:not([data-done])")];
+  if (nodes.length === 0) return;
+  loadKatex()
+    .then((katex) => {
+      for (const n of nodes) {
+        try {
+          katex.render(n.dataset.tex ?? n.textContent, n, {
+            displayMode: n.dataset.display === "1",
+            throwOnError: false,
+            trust: false,          // never allow \href / \url — board text is untrusted
+            strict: false,
+          });
+          n.dataset.done = "1";
+          n.classList.remove("tex-raw");
+        } catch {
+          n.classList.add("tex-raw");
+          n.dataset.done = "1";
+        }
+      }
+    })
+    .catch(() => {
+      for (const n of nodes) { n.classList.add("tex-raw"); n.dataset.done = "1"; }
+    });
 }
 
 function cssVar(name) {
@@ -686,13 +903,104 @@ function configureMermaid(m) {
 }
 
 let mermaidSeq = 0;
-function renderMermaid(host, source) {
+function renderMermaid(host, source, title) {
   loadMermaid()
     .then((m) => { configureMermaid(m); return m.render(`mmd${++mermaidSeq}`, source); })
-    .then(({ svg }) => { host.innerHTML = svg; })
+    .then(({ svg }) => {
+      host.innerHTML = svg;
+      host.classList.add("zoomable");
+      host.title = "Click to zoom";
+      host.addEventListener("click", () => {
+        const node = host.querySelector("svg");
+        if (node) openZoom(node.cloneNode(true), title);
+      });
+    })
     .catch(() => {
       host.innerHTML = `<pre style="width:100%;overflow-x:auto;background:var(--ink-950);border:1px solid var(--ink-800);border-radius:12px;padding:14px;font-size:12px;color:var(--ink-300)"><code>${esc(source)}</code></pre>`;
     });
+}
+
+/* ── Zoom / lightbox (diagrams and figures) ────────────────────────── */
+
+const zoom = { scale: 1, x: 0, y: 0, drag: null };
+
+function zoomApply() {
+  const inner = document.getElementById("zoomInner");
+  inner.style.transform = `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`;
+  document.getElementById("zoomPct").textContent = `${Math.round(zoom.scale * 100)}%`;
+}
+
+function zoomBy(factor) {
+  zoom.scale = Math.min(8, Math.max(0.25, zoom.scale * factor));
+  zoomApply();
+}
+
+function zoomFit() { zoom.scale = 1; zoom.x = 0; zoom.y = 0; zoomApply(); }
+
+function closeZoom() {
+  document.getElementById("zoomOverlay").hidden = true;
+  document.getElementById("zoomInner").innerHTML = "";
+}
+
+/** Opens a detached node (an SVG or img clone) full-screen, pan + wheel-zoom. */
+function openZoom(node, title) {
+  const overlay = document.getElementById("zoomOverlay");
+  const inner = document.getElementById("zoomInner");
+  inner.innerHTML = "";
+  if (node.tagName?.toLowerCase() === "svg") {
+    // Mermaid ships its SVGs with a width and a `max-width` inline style sized
+    // for the card. Drop both and re-size from the viewBox, or the clone either
+    // stays card-sized or collapses to nothing once it's out of flow.
+    node.removeAttribute("width");
+    node.removeAttribute("height");
+    node.style.maxWidth = "none";
+    node.style.maxHeight = "none";
+    const vb = (node.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+    const [vw, vh] = [vb[2], vb[3]];
+    if (vw > 0 && vh > 0) {
+      const fit = Math.min((window.innerWidth * 0.78) / vw, (window.innerHeight * 0.74) / vh);
+      node.style.width = `${vw * fit}px`;
+      node.style.height = `${vh * fit}px`;
+    } else {
+      node.style.width = "78vw";
+    }
+  }
+  inner.append(node);
+  overlay.hidden = false;
+  overlay.setAttribute("aria-label", title ? `Zoomed: ${title}` : "Zoomed figure");
+  zoomFit();
+}
+
+function wireZoom() {
+  const overlay = document.getElementById("zoomOverlay");
+  const stage = document.getElementById("zoomStage");
+
+  document.getElementById("zoomIn").addEventListener("click", () => zoomBy(1.25));
+  document.getElementById("zoomOut").addEventListener("click", () => zoomBy(0.8));
+  document.getElementById("zoomReset").addEventListener("click", zoomFit);
+  document.getElementById("zoomClose").addEventListener("click", closeZoom);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeZoom(); });
+
+  stage.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoomBy(e.deltaY < 0 ? 1.12 : 0.89);
+  }, { passive: false });
+
+  stage.addEventListener("pointerdown", (e) => {
+    zoom.drag = { px: e.clientX, py: e.clientY };
+    stage.classList.add("dragging");
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!zoom.drag) return;
+    zoom.x += e.clientX - zoom.drag.px;
+    zoom.y += e.clientY - zoom.drag.py;
+    zoom.drag = { px: e.clientX, py: e.clientY };
+    zoomApply();
+  });
+  const endDrag = () => { zoom.drag = null; stage.classList.remove("dragging"); };
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
 }
 
 /* ── Progress (localStorage, per board) ────────────────────────────── */
@@ -775,6 +1083,7 @@ const KICKERS = {
   video: ["▶", "Watch"], diagram: ["⬡", "Diagram"], code: ["⌘", "Code"],
   flashcards: ["⧉", "Recall"], resource: ["↗", "Go deeper"],
   roadmap: ["⚑", "Plan"], glossary: ["✱", "Glossary"],
+  image: ["🖼", "Figure"], chart: ["▦", "Data"],
 };
 const ACCENTS = ["var(--accent)", "var(--coral)", "var(--mint)", "var(--gold)", "var(--sky)"];
 
@@ -805,10 +1114,14 @@ function renderBlock(block, index) {
     case "diagram": {
       const host = el("div", { class: "mermaid-host" }, ["Rendering diagram…"]);
       card.append(host);
-      renderMermaid(host, block.mermaid ?? "");
+      renderMermaid(host, block.mermaid ?? "", block.title);
       if (block.caption) card.append(el("div", { class: "diagram-caption" }, [block.caption]));
       break;
     }
+    case "image": case "chart":
+      card.append(block.type === "image" ? renderImage(block) : renderChart(block));
+      if (block.markdown) card.append(el("div", { class: "md" , html: md2html(block.markdown) }));
+      break;
     case "code": card.append(renderCode(block)); break;
     case "flashcards": card.append(renderFlashcards(block)); break;
 
@@ -980,6 +1293,332 @@ function hostOf(url) {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "web"; }
 }
 
+/* ── Images ────────────────────────────────────────────────────────── */
+
+/**
+ * Image sources only. Same rule as safeUrl, plus the `data:image/…;base64,…`
+ * form that an offline export bakes in — restricted to the image MIME types
+ * the exporter emits, and with SVG excluded because an inline SVG document
+ * can carry script. Anything else (including `data:text/html`) is refused.
+ */
+const DATA_IMAGE = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=\s]+$/;
+
+function safeImageUrl(u) {
+  if (typeof u === "string" && DATA_IMAGE.test(u)) return u;
+  return safeUrl(u);
+}
+
+function renderImage(block) {
+  const fig = el("figure", { class: "figure" });
+  const href = safeImageUrl(block.url);
+  if (!href) {
+    fig.append(el("div", { class: "broken" }, [`⚠ unsupported image link: ${block.url ?? "(none)"}`]));
+    return fig;
+  }
+  const img = el("img", {
+    src: href,
+    alt: block.alt ?? block.title ?? "",
+    loading: "lazy",
+    decoding: "async",
+  });
+  img.addEventListener("error", () => {
+    const ph = el("div", { class: "broken" }, [
+      `⚠ image didn't load — ${block.alt ?? block.title ?? "figure"}`,
+    ]);
+    img.replaceWith(ph);
+  });
+  img.addEventListener("click", () => openZoom(img.cloneNode(true), block.title));
+  fig.append(img);
+  if (block.caption || block.credit) {
+    const cap = el("figcaption", {}, [block.caption ?? ""]);
+    if (block.credit) cap.append(el("span", { class: "credit" }, [block.credit]));
+    fig.append(cap);
+  }
+  return fig;
+}
+
+/* ── Charts ────────────────────────────────────────────────────────── */
+
+const SERIES_VARS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6"];
+const seriesColor = (i) => `var(${SERIES_VARS[i % SERIES_VARS.length]})`;
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function svg(tag, attrs = {}, children = []) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null) n.setAttribute(k, String(v));
+  for (const c of [].concat(children)) if (c != null) n.append(c.nodeType ? c : document.createTextNode(c));
+  return n;
+}
+
+/** Axis ticks on round numbers (1/2/5 × 10ⁿ), always including the baseline. */
+function niceTicks(min, max, target = 5) {
+  if (!isFinite(min) || !isFinite(max)) return { ticks: [0, 1], lo: 0, hi: 1 };
+  if (min === max) { min = Math.min(0, min); max = max === 0 ? 1 : max * 1.2; }
+  const span = max - min;
+  const raw = span / target;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm >= 5 ? 10 : norm >= 2 ? 5 : norm >= 1 ? 2 : 1) * mag;
+  const lo = Math.floor(min / step) * step;
+  const hi = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Math.round(v / step) * step);
+  return { ticks, lo, hi };
+}
+
+const fmtNum = (n) => {
+  if (!isFinite(n)) return "–";
+  const a = Math.abs(n);
+  if (a >= 1e9) return (n / 1e9).toFixed(a >= 1e10 ? 0 : 1) + "B";
+  if (a >= 1e6) return (n / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+  if (a >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (Number.isInteger(n)) return String(n);
+  return String(Math.round(n * 100) / 100);
+};
+
+/** Normalizes both accepted shapes into {names, rows:[{label,x,values[]}]}. */
+function normalizeChart(block) {
+  const kind = ["line", "bar", "scatter"].includes(block.chart) ? block.chart : "bar";
+  const series = Array.isArray(block.series) ? block.series.filter((s) => s && typeof s === "object") : [];
+  // Scatter shows all pairs at once; the validated palette only clears the
+  // all-pairs floors for three slots, so cap it there.
+  const capped = kind === "scatter" ? series.slice(0, 3) : series.slice(0, 6);
+  const names = capped.map((s, i) => String(s.name ?? `Series ${i + 1}`));
+
+  if (kind === "bar") {
+    const cats = (Array.isArray(block.categories) ? block.categories : []).map(String);
+    const rows = cats.map((label, ci) => ({
+      label,
+      x: ci,
+      values: capped.map((s) => Number((s.values ?? [])[ci])),
+    }));
+    return { kind, names, rows, categorical: true };
+  }
+
+  const xs = new Set();
+  for (const s of capped) for (const p of s.points ?? []) if (p && isFinite(Number(p.x))) xs.add(Number(p.x));
+  const sorted = [...xs].sort((a, b) => a - b);
+  const rows = sorted.map((x) => ({
+    label: fmtNum(x),
+    x,
+    values: capped.map((s) => {
+      const hit = (s.points ?? []).find((p) => Number(p?.x) === x);
+      return hit ? Number(hit.y) : NaN;
+    }),
+  }));
+  return { kind, names, rows, categorical: false };
+}
+
+function renderChart(block) {
+  const wrap = el("div");
+  const { kind, names, rows, categorical } = normalizeChart(block);
+  if (names.length === 0 || rows.length === 0) {
+    wrap.append(el("p", { class: "res-desc" }, ["(chart has no data)"]));
+    return wrap;
+  }
+
+  const W = 640, H = 300;
+  const padL = 52, padR = 16, padT = 12, padB = categorical ? 46 : 40;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  const allY = rows.flatMap((r) => r.values).filter((v) => isFinite(v));
+  const { ticks, lo, hi } = niceTicks(Math.min(0, ...allY), Math.max(...allY));
+  const yOf = (v) => padT + plotH - ((v - lo) / (hi - lo || 1)) * plotH;
+
+  const xsNum = rows.map((r) => r.x);
+  const xMin = Math.min(...xsNum), xMax = Math.max(...xsNum);
+  const xOf = categorical
+    ? (i) => padL + (plotW / rows.length) * (i + 0.5)
+    : (i) => padL + ((rows[i].x - xMin) / ((xMax - xMin) || 1)) * plotW;
+
+  const holder = el("div", { class: "chart-wrap" });
+  const root = svg("svg", {
+    viewBox: `0 0 ${W} ${H}`, role: "img",
+    "aria-label": `${block.chart ?? "chart"}: ${block.title ?? ""}`,
+  });
+  root.append(svg("title", {}, [block.title ?? "chart"]));
+  if (block.caption) root.append(svg("desc", {}, [block.caption]));
+
+  // gridlines + y ticks
+  const grid = svg("g", { class: "chart-grid" });
+  const tickG = svg("g");
+  for (const t of ticks) {
+    const y = yOf(t);
+    grid.append(svg("line", { x1: padL, x2: W - padR, y1: y, y2: y }));
+    tickG.append(svg("text", { class: "chart-tick", x: padL - 8, y: y + 3.5, "text-anchor": "end" }, [fmtNum(t)]));
+  }
+  root.append(grid, tickG);
+
+  // baseline axis
+  root.append(svg("g", { class: "chart-axis" }, [
+    svg("line", { x1: padL, x2: W - padR, y1: yOf(Math.max(lo, 0)), y2: yOf(Math.max(lo, 0)) }),
+  ]));
+
+  // x labels, thinned by measured width rather than by index — on a numeric
+  // axis the points bunch up wherever the data does, so every-nth still
+  // collides. The last label always wins; earlier ones yield to it.
+  const xLabels = svg("g");
+  const CHAR_W = 5.6;             // ≈ width of a digit at the tick font size
+  const label = (r) => (r.label.length > 12 ? r.label.slice(0, 11) + "…" : r.label);
+  const halfW = (t) => (t.length * CHAR_W) / 2;
+  const placed = [];
+  rows.forEach((r, i) => {
+    const t = label(r);
+    const cx = xOf(i);
+    const left = cx - halfW(t);
+    const last = placed[placed.length - 1];
+    if (last && left < last.right + 8) {
+      // Collides with the label before it. The final tick is the one readers
+      // anchor on, so it evicts the loser instead of being dropped itself.
+      if (i !== rows.length - 1) return;
+      placed.pop();
+    }
+    placed.push({ cx, right: cx + halfW(t), t });
+  });
+  for (const p of placed) {
+    xLabels.append(svg("text", {
+      class: "chart-tick", x: p.cx, y: H - padB + 16, "text-anchor": "middle",
+    }, [p.t]));
+  }
+  root.append(xLabels);
+
+  if (block.xLabel) {
+    root.append(svg("text", { class: "chart-axis-label", x: padL + plotW / 2, y: H - 4, "text-anchor": "middle" }, [block.xLabel]));
+  }
+  if (block.yLabel) {
+    root.append(svg("text", {
+      class: "chart-axis-label", x: 12, y: padT + plotH / 2, "text-anchor": "middle",
+      transform: `rotate(-90 12 ${padT + plotH / 2})`,
+    }, [block.yLabel]));
+  }
+
+  // marks
+  const baseY = yOf(Math.max(lo, 0));
+  if (kind === "bar") {
+    const band = plotW / rows.length;
+    const gap = 2;                                    // surface gap between bars
+    const barW = Math.min(24, (band - 14) / names.length - gap);
+    rows.forEach((r, i) => {
+      names.forEach((_, si) => {
+        const v = r.values[si];
+        if (!isFinite(v)) return;
+        const groupW = names.length * barW + (names.length - 1) * gap;
+        const x = xOf(i) - groupW / 2 + si * (barW + gap);
+        const y = yOf(v);
+        const h = Math.max(1, Math.abs(baseY - y));
+        root.append(svg("rect", {
+          class: "chart-bar", x, y: Math.min(y, baseY), width: Math.max(2, barW), height: h,
+          fill: seriesColor(si),
+        }));
+      });
+    });
+  } else {
+    names.forEach((_, si) => {
+      const pts = rows.map((r, i) => ({ x: xOf(i), y: yOf(r.values[si]), ok: isFinite(r.values[si]) }))
+                      .filter((p) => p.ok);
+      if (pts.length === 0) return;
+      if (kind === "line" && pts.length > 1) {
+        root.append(svg("path", {
+          class: "chart-line",
+          d: pts.map((p, k) => `${k ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "),
+          stroke: seriesColor(si),
+        }));
+      }
+      const r = kind === "scatter" ? 5 : 4;
+      for (const p of pts) {
+        root.append(svg("circle", { class: "chart-dot", cx: p.x, cy: p.y, r, fill: seriesColor(si) }));
+      }
+      // direct end-label for line charts with few series (labels before legend)
+      if (kind === "line" && names.length <= 4) {
+        const last = pts[pts.length - 1];
+        root.append(svg("text", {
+          class: "chart-vlabel", x: Math.min(last.x + 8, W - padR), y: last.y + 3.5,
+          "text-anchor": last.x > W - padR - 40 ? "end" : "start",
+        }, [fmtNum(rows[rows.length - 1].values[si])]));
+      }
+    });
+  }
+
+  // hover: crosshair + tooltip
+  const cross = svg("line", { class: "chart-crosshair", y1: padT, y2: padT + plotH });
+  root.append(cross);
+  const hit = svg("rect", { class: "chart-hit", x: padL, y: padT, width: plotW, height: plotH });
+  root.append(hit);
+  const tip = el("div", { class: "chart-tip" });
+  holder.append(root, tip);
+
+  const showTip = (evt) => {
+    const box = root.getBoundingClientRect();
+    const px = ((evt.clientX - box.left) / box.width) * W;
+    let best = 0, bestD = Infinity;
+    rows.forEach((_, i) => { const d = Math.abs(xOf(i) - px); if (d < bestD) { bestD = d; best = i; } });
+    const r = rows[best];
+    tip.innerHTML = "";
+    tip.append(el("b", {}, [categorical ? r.label : `${block.xLabel ?? "x"} ${r.label}`]));
+    names.forEach((n, si) => {
+      if (!isFinite(r.values[si])) return;
+      const row = el("div", { class: "row" });
+      row.append(el("i", { style: `background:${seriesColor(si)}` }), el("span", {}, [n]),
+                 el("span", { class: "v" }, [fmtNum(r.values[si])]));
+      tip.append(row);
+    });
+    const cx = (xOf(best) / W) * box.width;
+    tip.style.left = `${Math.min(Math.max(cx + 12, 8), box.width - 150)}px`;
+    tip.style.top = `${Math.max(evt.clientY - box.top - 10, 4)}px`;
+    tip.style.opacity = "1";
+    cross.setAttribute("x1", xOf(best));
+    cross.setAttribute("x2", xOf(best));
+    cross.style.opacity = kind === "bar" ? "0" : "1";
+  };
+  hit.addEventListener("mousemove", showTip);
+  hit.addEventListener("mouseleave", () => { tip.style.opacity = "0"; cross.style.opacity = "0"; });
+
+  wrap.append(holder);
+
+  // legend — always for ≥2 series, never for one (the title names it)
+  if (names.length > 1) {
+    const legend = el("div", { class: "chart-legend" });
+    names.forEach((n, si) => {
+      legend.append(el("span", { class: "k" }, [
+        el("i", { style: `background:${seriesColor(si)}` }), el("span", {}, [n]),
+      ]));
+    });
+    wrap.append(legend);
+  }
+
+  // table view — the relief for light-surface contrast, and useful anyway
+  const foot = el("div", { class: "chart-foot" });
+  foot.append(el("div", { class: "chart-caption" }, [block.caption ?? ""]));
+  const toggle = el("button", { class: "chart-tabletoggle no-print" }, ["Show data"]);
+  foot.append(toggle);
+  wrap.append(foot);
+
+  const table = el("table", { class: "chart-table", hidden: "" });
+  const head = el("tr", {}, [el("th", {}, [block.xLabel ?? (categorical ? "Category" : "x")])]);
+  names.forEach((n) => head.append(el("th", {}, [n])));
+  table.append(el("thead", {}, [head]));
+  const tbody = el("tbody");
+  for (const r of rows) {
+    const tr = el("tr", {}, [el("td", {}, [r.label])]);
+    r.values.forEach((v) => tr.append(el("td", { class: "num" }, [isFinite(v) ? fmtNum(v) : "–"])));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+  toggle.addEventListener("click", () => {
+    const shown = !table.hasAttribute("hidden");
+    if (shown) table.setAttribute("hidden", ""); else table.removeAttribute("hidden");
+    toggle.textContent = shown ? "Show data" : "Hide data";
+  });
+
+  if (Array.isArray(block.series) && block.series.length > names.length) {
+    wrap.append(el("p", { class: "chart-caption", style: "margin-top:6px" }, [
+      `Showing the first ${names.length} of ${block.series.length} series — beyond that, colors stop being reliably distinguishable.`,
+    ]));
+  }
+  return wrap;
+}
+
 function renderVideo(block) {
   const wrap = el("div");
   const id = /^[A-Za-z0-9_-]{11}$/.test(block.videoId ?? "") ? block.videoId : null;
@@ -1141,6 +1780,7 @@ function overviewMindmap(board) {
   const lines = ["mindmap", `  root((${safe(board.title)}))`];
   const groups = {
     Concepts: board.blocks.filter((b) => b.type === "concept"),
+    Evidence: board.blocks.filter((b) => ["chart", "image"].includes(b.type)),
     Practice: board.blocks.filter((b) => ["flashcards", "code"].includes(b.type)),
     Watch: board.blocks.filter((b) => b.type === "video"),
     Read: board.blocks.filter((b) => b.type === "resource"),
@@ -1236,6 +1876,7 @@ function render() {
   }
 
   app.append(main);
+  typesetMath(app);
   syncChrome();
 }
 
@@ -1384,8 +2025,13 @@ researchOverlay.addEventListener("click", (e) => {
   if (e.target === researchOverlay) researchOverlay.hidden = true;
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { researchOverlay.hidden = true; reviewOverlay.hidden = true; }
+  if (e.key !== "Escape") return;
+  // Zoom sits above the panels — close only the topmost thing that's open.
+  if (!$("#zoomOverlay").hidden) { closeZoom(); return; }
+  researchOverlay.hidden = true;
+  reviewOverlay.hidden = true;
 });
+wireZoom();
 
 /* ── Cross-board spaced-repetition review ──────────────────────────── */
 
@@ -1548,6 +2194,7 @@ async function showResearchFile(path, btn) {
     const text = await res.text();
     if (path.endsWith(".md")) {
       content.append(el("div", { class: "md", html: md2html(text) }));
+      typesetMath(content);
     } else if (path.endsWith(".json")) {
       let pretty = text;
       try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { /* keep raw */ }

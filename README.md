@@ -111,6 +111,23 @@ Six complete visual identities — `midnight`, `blueprint`, `terminal`, `paper`,
 </tr>
 </table>
 
+### Built to show, not just tell
+
+Boards render **Mermaid diagrams and mindmaps**, **real typeset math** via KaTeX (`$$\frac{QK^\top}{\sqrt{d_k}}$$`, not "Q K transpose over root d k"), **figures**, and **charts drawn from actual data** — line, bar, and scatter, with hover tooltips, a legend, and a "Show data" table for every one.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/math.png" alt="A concept card with typeset math"><br><em>Real TeX, inline and display</em></td>
+<td width="50%"><img src="docs/screenshots/chart.png" alt="A chart card with two series"><br><em>Charts from real numbers, with a table view</em></td>
+</tr>
+</table>
+
+The chart palette isn't chosen by eye. It's six hues validated with a colorblindness checker against all six theme surfaces — lightness band, chroma floor, adjacent-pair CVD separation, contrast — with a separate set of steps for light themes rather than an automatic flip. Series count is capped where the colors stop being reliably distinguishable, and the app says so instead of quietly cycling hues.
+
+Every diagram and figure is **click-to-zoom**: full-screen, wheel to scale, drag to pan, Escape to leave. Detail is worth putting in.
+
+![A diagram opened full-screen](docs/screenshots/diagram-zoom.png)
+
 ### Your notes live in the board
 
 Annotate any card in your own words. Notes save **into the board JSON**, survive exports and shares, and Claude reads them on the next iteration — write *"still don't get this"* and ask for a rewrite, and it knows exactly what you meant.
@@ -133,8 +150,9 @@ Every plan, note, and raw scraper dump is saved and browsable in the app — so 
 
 - **"Updated" badges** on cards Claude changed since your last visit
 - **Cross-board links** — related concepts jump between boards and highlight the target card
-- **Click-to-play video lectures**, Mermaid diagrams, code blocks with copy buttons
-- **Full-text filtering**, JSON export, standalone HTML export, print/PDF
+- **Click-to-play video lectures**, code blocks with copy buttons
+- **Full-text filtering**, JSON export, print/PDF
+- **Standalone HTML export** — one file that opens anywhere; `--offline` bakes in the diagram and math engines and the board's figures too, so it works on a plane
 
 ## Modes
 
@@ -179,8 +197,8 @@ Every script is standalone, stdlib-only, and usable on its own.
 | `scrape_web.py` | DuckDuckGo search + readable article extraction (two independent endpoints for resilience) |
 | `scrape_youtube.py` | Real video IDs, titles, channels, durations |
 | `scrape_arxiv.py` | Papers via the official arXiv API — abstracts, authors, PDF links |
-| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, Mermaid hygiene |
-| `export_html.py` | Bakes a board into one self-contained HTML file |
+| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, Mermaid hygiene |
+| `export_html.py` | Bakes a board into one self-contained HTML file (`--offline` inlines Mermaid, KaTeX and figures) |
 | `serve.py` | Local app server + boards/research API |
 | `publish.py` | Pushes your exported boards to a `gh-pages` branch with a generated index |
 
@@ -192,7 +210,7 @@ python3 scripts/serve.py --boards-dir .superlearn/boards --port 4321
 
 ## Board format
 
-Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `code`, `video`, `resource`, `flashcards`, `glossary`. Any block may carry your `annotation` and `related` cross-board links.
+Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `chart`, `image`, `code`, `video`, `resource`, `flashcards`, `glossary`. Markdown fields render TeX. Any block may carry your `annotation` and `related` cross-board links.
 
 The full schema and the rules Claude follows live in [`skills/superlearn/SKILL.md`](skills/superlearn/SKILL.md). Validate any board with `python3 scripts/validate_board.py <board.json>`.
 

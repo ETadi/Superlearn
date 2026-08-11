@@ -141,10 +141,40 @@ Every block: `"type"`, `"title"`, plus type-specific fields. Markdown fields sup
 | `code` | `language`, `code`, `explanation` | Runnable, idiomatic examples. Only for technical topics. |
 | `video` | `videoId`, `channel`, `reason` | **Only videoIds from the scraper output.** Never invent IDs. `reason` = why this video earns its slot. Prefer lectures and deep talks over pop explainers. |
 | `resource` | `url`, `source`, `description` | **Only URLs from your research.** Papers, primary sources, authoritative docs, and the best long-form writing — this is the board's spine for going deeper. |
+| `chart` | `chart`, `series`, plus `categories`/`points` | Real quantitative data — see **Charts** below. Only with numbers you actually found; never invent a trend line. |
+| `image` | `url`, `alt`, `caption`, `credit` | A figure that carries information a diagram can't: a photo, a scan, an official architecture graphic. **Only URLs seen in your research**, and always `alt`. Don't decorate — if it doesn't teach, leave it out. |
 | `flashcards` | `cards: [{front, back}]` | Optional. Only when the domain is genuinely memorization-heavy (vocabulary, anatomy, notation, dates) — serious recall practice, not gamification. |
 | `glossary` | `entries: [{term, definition}]` | The vocabulary of the field. |
 
-A standard board is 12–18 blocks: 1 summary, 1 roadmap, 4–8 concepts, 1–3 diagrams (≥1 mindmap), 1–3 notes, code if technical, 2–4 videos, **4–8 resources** (papers, docs, long-form articles), 1 glossary, flashcards only where recall genuinely matters. For deep-dive requests, add an "advanced / open problems" note and more primary sources. Scale down for "quick overview".
+A standard board is 12–18 blocks: 1 summary, 1 roadmap, 4–8 concepts, 1–3 diagrams (≥1 mindmap), 1–3 notes, code if technical, 2–4 videos, **4–8 resources** (papers, docs, long-form articles), 1 glossary, a `chart` or `image` wherever the evidence is quantitative or visual, flashcards only where recall genuinely matters. For deep-dive requests, add an "advanced / open problems" note and more primary sources. Scale down for "quick overview".
+
+### Math
+
+Any markdown field renders TeX through KaTeX:
+
+- `$$ ... $$` — display math, on its own line (a whole line of `$$…$$` becomes a centered block).
+- `\( ... \)` — inline math inside a sentence. **Prefer this form inline** — it's unambiguous.
+- `$ ... $` — also inline, but only recognized when the content contains `^`, `_`, `{`, `}` or `\`, so "costs $5 to $10" is left alone. When in doubt use `\(…\)`.
+
+Use real math wherever the field uses real math — attention as $\mathrm{softmax}(QK^\top/\sqrt{d_k})V$, not "softmax of Q K transpose over root d k". Escape a literal dollar sign as `\$`.
+
+### Charts
+
+A `chart` block draws a themed, accessible SVG (hover tooltips, legend, and a "Show data" table view) from data you supply. Reach for one whenever the research turned up numbers worth comparing — benchmark results, adoption over time, complexity growth, survey breakdowns.
+
+```json
+{ "type": "chart", "title": "Inference latency by batch size", "chart": "line",
+  "yLabel": "ms/token", "xLabel": "batch size", "caption": "A100, fp16 — source: …",
+  "series": [{ "name": "FlashAttention-2", "points": [{"x": 1, "y": 12.4}, {"x": 8, "y": 15.1}] }] }
+```
+
+- `chart`: `"bar"` | `"line"` | `"scatter"`.
+- **bar** takes `categories: ["a","b",…]` and each series a `values: [n, n, …]` of the *same length*.
+- **line** and **scatter** take each series a `points: [{x, y}, …]` with numeric x and y.
+- Always set `yLabel` — an unlabeled axis is a guess about units.
+- Ceiling of **6 series** (3 for scatter); past that colors stop being distinguishable and the app drops the extras. Split into two charts instead.
+- One measure per chart. Two things on different scales are two charts, never two y-axes.
+- Never fabricate figures to make a chart. No data → write a `note` instead.
 
 ### Cross-board links and user annotations
 
@@ -167,6 +197,8 @@ After validation passes, bake a self-contained HTML file — the whole app plus 
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/export_html.py" .superlearn/boards/<slug>.json
 # → .superlearn/exports/<slug>.html
 ```
+
+Add `--offline` when the user wants the file to work with no network at all (on a plane, in an air-gapped environment, as a long-term archive). It inlines Mermaid, KaTeX, and the board's figures — a much bigger file, but diagrams, math, and images all render from the file itself. Downloads are cached in `.superlearn/vendor/` and reused.
 
 Re-export after any later board edit so the file stays current.
 
@@ -209,5 +241,5 @@ Rules for iteration: **edit surgically** — never regenerate the whole board fo
 - **Grounded**: claims trace to research notes; no invented URLs or videoIds — the validator and the app both enforce this, but you enforce it first.
 - **Deep, not gamified**: this is a tool for people who want mastery. No quizzes, no filler engagement mechanics. Advanced sections, primary sources, open problems, and honest complexity belong on the board.
 - **Taught, not listed**: prefer "here's the idea, here's an example, here's the pitfall" over bullet dumps.
-- **Visual**: at least one mindmap of the whole territory; diagrams wherever structure beats prose.
+- **Visual**: at least one mindmap of the whole territory; diagrams wherever structure beats prose; a `chart` wherever the argument rests on numbers; real TeX wherever the field uses real TeX. Every diagram and figure is click-to-zoom, so detail is worth including.
 - **Designed**: layout and theme chosen for the subject, with the reasoning noted in plan.md — never the same default twice in a row out of habit.

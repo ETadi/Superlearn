@@ -23,6 +23,7 @@ LAYOUTS = {"board", "notes", "grid", "mindmap", "feed"}
 DEPTHS = {"overview", "standard", "deep"}
 THEMES = {"midnight", "blueprint", "terminal", "paper", "sepia", "arctic"}
 MODES = {"study", "interview", "research", "documentation"}
+CHART_KINDS = {"line", "bar", "scatter"}
 
 errors: list[str] = []
 warnings: list[str] = []
@@ -70,6 +71,70 @@ def check_mermaid(src: str, where: str) -> None:
         for m in re.finditer(r"\[([^\]\"]*)\]", src):
             if "(" in m.group(1) or ")" in m.group(1):
                 warn(f"{where}: parentheses inside node label '[{m.group(1)[:30]}]' — quote the label or remove them")
+
+
+def check_chart(b: dict, where: str) -> None:
+    """Charts carry their own data, so the shape has to be right or the SVG
+    renders empty. Bars are category-indexed; lines and scatters are (x, y)."""
+    kind = b.get("chart")
+    if kind not in CHART_KINDS:
+        err(f"{where}: chart 'chart' must be one of {sorted(CHART_KINDS)}")
+        return
+
+    series = b.get("series")
+    if not isinstance(series, list) or not series:
+        err(f"{where}: chart needs a non-empty 'series' array")
+        return
+    # Beyond these counts the palette stops separating reliably under CVD, so
+    # the app drops the extras — flag it at authoring time instead.
+    cap = 3 if kind == "scatter" else 6
+    if len(series) > cap:
+        warn(
+            f"{where}: {len(series)} series but only the first {cap} render "
+            f"({kind} colors stop being distinguishable past that) — split the chart"
+        )
+
+    cats = b.get("categories")
+    if kind == "bar":
+        if not isinstance(cats, list) or not cats:
+            err(f"{where}: bar chart needs a non-empty 'categories' array")
+            return
+        if not all(isinstance(c, (str, int, float)) for c in cats):
+            err(f"{where}: chart 'categories' must be strings or numbers")
+
+    for si, s in enumerate(series):
+        at = f"{where}.series[{si}]"
+        if not isinstance(s, dict):
+            err(f"{at}: not an object")
+            continue
+        if not isinstance(s.get("name"), str) or not s["name"].strip():
+            err(f"{at}: needs a 'name'")
+        if kind == "bar":
+            vals = s.get("values")
+            if not isinstance(vals, list):
+                err(f"{at}: bar series needs a 'values' array")
+            elif isinstance(cats, list) and len(vals) != len(cats):
+                err(f"{at}: {len(vals)} values but {len(cats)} categories — they must line up")
+            elif not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+                err(f"{at}: 'values' must all be numbers")
+        else:
+            pts = s.get("points")
+            if not isinstance(pts, list) or not pts:
+                err(f"{at}: {kind} series needs a non-empty 'points' array")
+                continue
+            for pi, p in enumerate(pts):
+                if (
+                    not isinstance(p, dict)
+                    or not isinstance(p.get("x"), (int, float))
+                    or not isinstance(p.get("y"), (int, float))
+                    or isinstance(p.get("x"), bool)
+                    or isinstance(p.get("y"), bool)
+                ):
+                    err(f"{at}.points[{pi}]: needs numeric 'x' and 'y'")
+                    break
+
+    if not b.get("yLabel"):
+        warn(f"{where}: no 'yLabel' — an unlabeled axis leaves the reader guessing at units")
 
 
 def check_block(b, i: int) -> None:
@@ -133,6 +198,13 @@ def check_block(b, i: int) -> None:
         for si, s in enumerate(steps):
             if not isinstance(s, dict) or not s.get("label"):
                 err(f"{where}.steps[{si}]: needs 'label'")
+    elif btype == "image":
+        if not is_http_url(b.get("url")):
+            err(f"{where}: image 'url' must be a valid http(s) URL")
+        if not isinstance(b.get("alt"), str) or not b["alt"].strip():
+            err(f"{where}: image needs a non-empty 'alt' description")
+    elif btype == "chart":
+        check_chart(b, where)
     elif btype == "glossary":
         entries = b.get("entries")
         if not isinstance(entries, list) or not entries:

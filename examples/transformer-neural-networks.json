@@ -30,7 +30,7 @@
       "type": "concept",
       "title": "Self-attention: queries, keys, values",
       "tagline": "Every word asks every other word: how relevant are you to me?",
-      "markdown": "Each token's embedding is projected into three vectors: a **query** (what am I looking for?), a **key** (what do I contain?), and a **value** (what do I contribute?).\n\nAttention scores come from dot products of queries with keys, scaled and softmaxed:\n\n```\nAttention(Q, K, V) = softmax(QKᵀ / √d_k) · V\n```\n\nIn *\"The animal didn't cross the street because **it** was tired\"*, the token `it` produces a query that matches the key of `animal` far more than `street` — so its output vector is built mostly from `animal`'s value. That's disambiguation, learned purely from data."
+      "markdown": "Each token's embedding is projected into three vectors: a **query** (what am I looking for?), a **key** (what do I contain?), and a **value** (what do I contribute?).\n\nAttention scores come from dot products of queries with keys, scaled and softmaxed:\n\n$$\\mathrm{Attention}(Q,K,V) = \\mathrm{softmax}\\!\\left(\\frac{QK^\\top}{\\sqrt{d_k}}\\right)V$$\n\nThe \\(\\sqrt{d_k}\\) divisor is not cosmetic: for large \\(d_k\\) the dot products grow in magnitude, pushing softmax into regions where its gradient vanishes.\n\nIn *\"The animal didn't cross the street because **it** was tired\"*, the token `it` produces a query that matches the key of `animal` far more than `street` — so its output vector is built mostly from `animal`'s value. That's disambiguation, learned purely from data."
     },
     {
       "type": "concept",
@@ -42,7 +42,7 @@
       "type": "concept",
       "title": "Positional encoding",
       "tagline": "Attention is order-blind — position must be injected.",
-      "markdown": "Self-attention treats its input as a **set**: shuffle the tokens and the attention scores shuffle with them. Language obviously cares about order, so transformers add position information to each embedding.\n\n- **Sinusoidal encodings** (the original): fixed sine/cosine waves of different frequencies.\n- **Learned positional embeddings**: just train a vector per position.\n- **RoPE (rotary)** — used by most modern LLMs: rotates Q/K vectors by an angle proportional to position, which elegantly encodes *relative* distances and extrapolates to longer contexts."
+      "markdown": "Self-attention treats its input as a **set**: shuffle the tokens and the attention scores shuffle with them. Language obviously cares about order, so transformers add position information to each embedding.\n\n- **Sinusoidal encodings** (the original): fixed sine/cosine waves of different frequencies — $$PE_{(pos,\\,2i)} = \\sin\\!\\left(\\frac{pos}{10000^{2i/d}}\\right), \\qquad PE_{(pos,\\,2i+1)} = \\cos\\!\\left(\\frac{pos}{10000^{2i/d}}\\right)$$\n- **Learned positional embeddings**: just train a vector per position.\n- **RoPE (rotary)** — used by most modern LLMs: rotates Q/K vectors by an angle proportional to position, which elegantly encodes *relative* distances and extrapolates to longer contexts."
     },
     {
       "type": "diagram",
@@ -55,6 +55,19 @@
       "title": "The transformer landscape",
       "mermaid": "mindmap\n  root((Transformers))\n    Mechanics\n      Self-attention\n      Multi-head\n      Positional encoding\n      Feed-forward\n    Training\n      Next-token prediction\n      Pretraining\n      Fine-tuning & RLHF\n      Scaling laws\n    Families\n      Decoder-only GPT-style\n      Encoder-only BERT-style\n      Encoder-decoder T5-style\n    Frontier\n      Mixture-of-experts\n      Long context\n      Multimodal",
       "caption": "The whole territory this board covers."
+    },
+    {
+      "type": "chart",
+      "title": "Where the compute actually goes",
+      "chart": "line",
+      "xLabel": "sequence length (tokens)",
+      "yLabel": "GFLOPs per layer",
+      "caption": "Derived from the layer definitions at d_model = 512 — not measured. The curves cross at n = 8d: below it the feed-forward network dominates, above it attention does, and from there the cost is quadratic.",
+      "series": [
+        { "name": "self-attention  (n\u00b2\u00b7d)", "points": [{ "x": 512, "y": 0.134 }, { "x": 1024, "y": 0.537 }, { "x": 2048, "y": 2.147 }, { "x": 4096, "y": 8.59 }, { "x": 8192, "y": 34.36 }, { "x": 16384, "y": 137.439 }] },
+        { "name": "feed-forward  (n\u00b7d\u00b2)", "points": [{ "x": 512, "y": 1.074 }, { "x": 1024, "y": 2.147 }, { "x": 2048, "y": 4.295 }, { "x": 4096, "y": 8.59 }, { "x": 8192, "y": 17.18 }, { "x": 16384, "y": 34.36 }] }
+      ],
+      "markdown": "This is the single most consequential fact about the architecture. Attention costs \\(O(n^2 d)\\) while the feed-forward network costs \\(O(n d^2)\\), so attention only becomes the bottleneck once \\(n > 8d\\). At \\(d = 512\\) that is 4,096 tokens — which is precisely why long-context work (FlashAttention, sliding windows, linear attention, state-space models) all targets this one term."
     },
     {
       "type": "code",
