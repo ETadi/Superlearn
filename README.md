@@ -94,7 +94,7 @@ A few minutes later:
 
 ## The app
 
-### Five layouts, switchable live
+### Six layouts, switchable live
 
 | View | What you get |
 |---|---|
@@ -102,9 +102,30 @@ A few minutes later:
 | **Notes** | A single-column document, ordered for reading |
 | **Grid** | Uniform card grid |
 | **Mindmap** | An auto-generated map of the whole territory, plus every diagram |
+| **Canvas** | The whole board as a **whiteboard** — see below |
 | **Feed** | Everything, full-width, in sequence |
 
 ![Mindmap view](docs/screenshots/view-mindmap.png)
+
+### The whiteboard
+
+Canvas view lays the entire board out spatially, like a wall you'd build in Miro: **one dashed frame per section**, numbered in reading order, with connectors tracing the path between them. Drag to pan, scroll to zoom, `Fit` to fill the width, `All` for the bird's-eye. Section labels counter-scale against the zoom, so the map stays legible from any distance.
+
+Claude authors the sections (`"section": "MVCC"` on each block), so the frames are real chapters — not type buckets. Boards without sections still get a canvas, grouped by what the blocks are.
+
+![Canvas view — the whole Postgres board as a whiteboard](docs/screenshots/canvas-fit.png)
+
+<div align="center"><em>…and zoomed in, cards are fully live — code runs, diagrams zoom, notes save:</em></div>
+
+![Canvas view zoomed into the MVCC section](docs/screenshots/canvas-zoom.png)
+
+### Focus mode, and knowing where you are
+
+**Focus** walks the board one card at a time — arrow keys to move, Esc to leave — and marks each card read as you go. Every card also has a ✓ tick, and the board carries a **reading progress bar** that persists across sessions. Open a half-studied board and it tells you exactly where you left off; Focus resumes at your first unread card.
+
+![Focus mode — one card, full attention](docs/screenshots/focus-mode.png)
+
+![The progress bar under the board title](docs/screenshots/progress.png)
 
 ### Claude designs the page for the topic
 
@@ -213,7 +234,7 @@ Every script is standalone, stdlib-only, and usable on its own.
 | `scrape_web.py` | DuckDuckGo search + readable article extraction (two independent endpoints for resilience) |
 | `scrape_youtube.py` | Real video IDs, titles, channels, durations |
 | `scrape_arxiv.py` | Papers via the official arXiv API — abstracts, authors, PDF links |
-| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, language tags, Mermaid hygiene |
+| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, language tags, sections, Mermaid hygiene |
 | `export_html.py` | Bakes a board into one self-contained HTML file (`--offline` inlines Mermaid, KaTeX, highlight.js and figures) |
 | `serve.py` | Local app server + boards/research API |
 | `publish.py` | Pushes your exported boards to a `gh-pages` branch with a generated index |
@@ -232,7 +253,7 @@ python3 scripts/serve.py --boards-dir examples --port 4321
 
 ## Board format
 
-Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `chart`, `image`, `code`, `video`, `resource`, `flashcards`, `glossary`. Markdown fields render TeX. Any block may carry your `annotation` and `related` cross-board links.
+Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — each optionally tagged with a `section` that becomes its frame on the whiteboard — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `chart`, `image`, `code`, `video`, `resource`, `flashcards`, `glossary`. Markdown fields render TeX. Any block may carry your `annotation` and `related` cross-board links.
 
 The full schema and the rules Claude follows live in [`skills/superlearn/SKILL.md`](skills/superlearn/SKILL.md). Validate any board with `python3 scripts/validate_board.py <board.json>`.
 

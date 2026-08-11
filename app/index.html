@@ -448,6 +448,103 @@
   .zoom-bar .pct { font-size: 12px; color: var(--ink-400); min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
   .mindmap-note { text-align: center; color: var(--ink-400); font-size: 13px; margin-bottom: 16px; }
 
+  /* ── Whiteboard / canvas view ───────────────────────────
+     The whole board as a spatial wall: section frames on a dotted surface,
+     connectors tracing the learning path, pan + zoom like a real whiteboard. */
+  .canvas-viewport {
+    position: relative; height: calc(100vh - 230px); min-height: 480px;
+    overflow: hidden; border: 1px solid var(--ink-800); border-radius: 18px;
+    background: var(--ink-950); cursor: grab; touch-action: none;
+  }
+  .canvas-viewport.dragging { cursor: grabbing; }
+  .canvas-surface {
+    position: absolute; transform-origin: 0 0;
+    background-image: radial-gradient(color-mix(in srgb, var(--ink-700) 55%, transparent) 1.2px, transparent 1.2px);
+    background-size: 26px 26px;
+  }
+  .canvas-edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+  .canvas-edges path {
+    fill: none; stroke: color-mix(in srgb, var(--accent) 45%, var(--ink-700));
+    stroke-width: clamp(2.5px, calc(3px / var(--cscale, 1)), 12px);
+    stroke-dasharray: 7 7;
+  }
+  .canvas-frame {
+    position: absolute; border: 1.5px dashed color-mix(in srgb, var(--accent) 38%, var(--ink-700));
+    border-radius: 20px; padding: 18px;
+    background: color-mix(in srgb, var(--ink-900) 94%, transparent);
+  }
+  .canvas-frame-label {
+    position: absolute; bottom: calc(100% + 10px); left: 0; display: flex; align-items: center;
+    gap: .55em; font-family: var(--font-display); font-weight: 700; color: var(--ink-100);
+    letter-spacing: .01em; white-space: nowrap; transform-origin: 0 100%;
+    /* Counter-scaled against the canvas zoom so section names read at any distance. */
+    font-size: clamp(16px, calc(15px / var(--cscale, 1)), 52px);
+    max-width: 100%;
+  }
+  .canvas-frame-label > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .canvas-frame-label .num {
+    display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; border-radius: .5em;
+    background: var(--accent); color: var(--ink-950); font-size: .82em; font-weight: 800;
+  }
+  .canvas-cols { display: flex; gap: 14px; align-items: flex-start; }
+  .canvas-col { width: 340px; display: flex; flex-direction: column; gap: 14px; }
+  .canvas-col .card { animation: none; }
+  .canvas-bar {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 3;
+    display: flex; gap: 6px; align-items: center;
+    background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 12px; padding: 6px;
+  }
+  .canvas-bar button { background: var(--ink-850); border: 1px solid var(--ink-700); color: var(--ink-200);
+                       border-radius: 8px; padding: 5px 12px; font-size: 13px; }
+  .canvas-bar button:hover { border-color: var(--accent); color: var(--ink-100); }
+  .canvas-bar .pct { font-size: 12px; color: var(--ink-400); min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+  .canvas-hint { position: absolute; top: 14px; right: 16px; z-index: 3; font-size: 11.5px; color: var(--ink-400);
+                 background: color-mix(in srgb, var(--ink-900) 80%, transparent); border: 1px solid var(--ink-800);
+                 border-radius: 9px; padding: 5px 11px; pointer-events: none; }
+
+  /* ── Read progress ──────────────────────────────────── */
+  .read-toggle {
+    position: absolute; top: 13px; right: 13px; z-index: 2;
+    width: 26px; height: 26px; border-radius: 8px; font-size: 13px; line-height: 1;
+    background: var(--ink-850); border: 1.5px solid var(--ink-700); color: var(--ink-500);
+  }
+  .card:not(:hover) .read-toggle:not(.on) { opacity: .25; }
+  .read-toggle:hover { border-color: var(--accent); color: var(--ink-200); }
+  .read-toggle.on { background: var(--accent); border-color: var(--accent); color: var(--ink-950); opacity: 1; font-weight: 800; }
+  .progress-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+  .progress-track { flex: 0 1 320px; height: 6px; border-radius: 4px; background: var(--ink-800); overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .35s ease; }
+  .progress-label { font-size: 12.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
+
+  /* ── Focus mode ─────────────────────────────────────── */
+  .focus-overlay {
+    position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column;
+    background: color-mix(in srgb, var(--ink-950) 96%, transparent); backdrop-filter: blur(10px);
+  }
+  .focus-overlay[hidden] { display: none; }
+  .focus-top {
+    display: flex; align-items: center; gap: 14px; padding: 14px 22px;
+    border-bottom: 1px solid var(--ink-800);
+  }
+  .focus-top .ftitle { font-family: var(--font-display); font-weight: 700; color: var(--ink-100); font-size: 15px; }
+  .focus-top .fcount { font-size: 12.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; margin-left: auto; }
+  .focus-top .progress-track { flex: 0 1 260px; margin: 0; }
+  .focus-top button { background: var(--ink-850); border: 1px solid var(--ink-700); color: var(--ink-200);
+                      border-radius: 8px; padding: 5px 12px; font-size: 13px; }
+  .focus-top button:hover { border-color: var(--accent); }
+  .focus-stage { flex: 1; overflow-y: auto; display: flex; justify-content: center; padding: 34px 22px 120px; }
+  .focus-stage > .card { width: min(860px, 100%); height: fit-content; }
+  .focus-nav {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 81;
+    display: flex; gap: 8px; align-items: center;
+    background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 14px; padding: 8px;
+  }
+  .focus-nav button { background: var(--ink-850); border: 1px solid var(--ink-700); color: var(--ink-200);
+                      border-radius: 9px; padding: 8px 18px; font-size: 13.5px; }
+  .focus-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--ink-100); }
+  .focus-nav button:disabled { opacity: .35; }
+  .focus-nav .fhint { font-size: 11.5px; color: var(--ink-500); padding: 0 10px; }
+
   /* ── Empty / picker states ──────────────────────────── */
   .empty { max-width: 640px; margin: 12vh auto; text-align: center; padding: 0 20px; }
   .empty .big { font-size: 54px; margin-bottom: 18px; }
@@ -593,10 +690,12 @@
     <button data-view="notes">Notes</button>
     <button data-view="grid">Grid</button>
     <button data-view="mindmap">Mindmap</button>
+    <button data-view="canvas">Canvas</button>
     <button data-view="feed">Feed</button>
   </nav>
   <div class="spacer"></div>
   <input type="search" id="search" placeholder="Filter blocks…" aria-label="Filter blocks" />
+  <button class="btn" id="focusBtn" title="Study one card at a time, in order">Focus</button>
   <button class="btn" id="reviewBtn" title="Spaced-repetition review across all boards">Review</button>
   <button class="btn" id="researchBtn" title="Browse the research trail behind this board">Research</button>
   <button class="btn" id="exportBtn" title="Download board JSON">JSON</button>
@@ -629,6 +728,21 @@
       <button id="reviewClose" class="btn" aria-label="Close">✕</button>
     </div>
     <div id="reviewBody" class="research-content"></div>
+  </div>
+</div>
+
+<div id="focusOverlay" class="focus-overlay no-print" hidden>
+  <div class="focus-top">
+    <span class="ftitle" id="focusTitle"></span>
+    <div class="progress-track"><div class="progress-fill" id="focusFill" style="width:0%"></div></div>
+    <span class="fcount" id="focusCount"></span>
+    <button id="focusClose" aria-label="Exit focus mode">✕ Exit</button>
+  </div>
+  <div class="focus-stage" id="focusStage"></div>
+  <div class="focus-nav">
+    <button id="focusPrev">← Prev</button>
+    <span class="fhint">← → to move · Esc to exit · cards are marked read as you go</span>
+    <button id="focusNext">Next →</button>
   </div>
 </div>
 
@@ -1341,6 +1455,38 @@ function loadProgressFor(id) {
 }
 function saveProgressFor(id, p) { localStorage.setItem(progressKeyFor(id), JSON.stringify(p)); }
 
+/* ── Read progress (per board, per block) ──────────────────────────── */
+
+function blockKeyOf(block) { return String(block.id ?? block.title ?? ""); }
+
+function isRead(block) {
+  if (!state.board) return false;
+  return Boolean(loadProgressFor(state.board.id).read?.[blockKeyOf(block)]);
+}
+
+function setRead(block, val) {
+  if (!state.board) return;
+  const p = loadProgressFor(state.board.id);
+  p.read = p.read ?? {};
+  if (val) p.read[blockKeyOf(block)] = 1;
+  else delete p.read[blockKeyOf(block)];
+  saveProgressFor(state.board.id, p);
+  updateReadBar();
+}
+
+/** Refreshes every visible progress bar without a full re-render, so ticking
+    a card doesn't reset the reader's scroll position. */
+function updateReadBar() {
+  if (!state.board) return;
+  const total = state.board.blocks.filter((b) => b.type !== "quiz").length;
+  const read = state.board.blocks.filter((b) => b.type !== "quiz" && isRead(b)).length;
+  const pct = total ? Math.round((read / total) * 100) : 0;
+  for (const bar of document.querySelectorAll("[data-readfill]")) bar.style.width = `${pct}%`;
+  for (const lab of document.querySelectorAll("[data-readlabel]")) {
+    lab.textContent = read === 0 ? `${total} blocks to work through` : `${read} of ${total} read · ${pct}%`;
+  }
+}
+
 /* ── Spaced repetition (SM-2-lite) ─────────────────────────────────── */
 
 const DAY = 86400000;
@@ -1427,6 +1573,21 @@ function renderBlock(block, index) {
   const kicker = el("div", { class: "kicker" }, [`${icon} ${label}`]);
   if (isNew) kicker.append(el("span", { class: "chip newbadge" }, ["updated"]));
   card.append(kicker);
+
+  // Read tick — top-right, persisted per board, feeds the progress bar.
+  const read = isRead(block);
+  const tick = el("button", {
+    class: "read-toggle no-print" + (read ? " on" : ""),
+    title: read ? "Mark as unread" : "Mark as read",
+  }, ["✓"]);
+  tick.addEventListener("click", () => {
+    const now = !tick.classList.contains("on");
+    tick.classList.toggle("on", now);
+    tick.title = now ? "Mark as unread" : "Mark as read";
+    setRead(block, now);
+  });
+  card.append(tick);
+
   card.append(el("h2", {}, [block.title ?? ""]));
 
   switch (block.type) {
@@ -2140,6 +2301,240 @@ function overviewMindmap(board) {
   return lines.join("\n");
 }
 
+/* ── Whiteboard / canvas view ──────────────────────────────────────────
+   The whole board laid out spatially: one dashed frame per section on a
+   dotted surface, connectors tracing the path between them, pan + zoom.
+   Sections come from each block's optional `section` field; boards without
+   one are grouped by what the blocks are.                                */
+
+const TYPE_SECTIONS = {
+  summary: "Overview", roadmap: "Overview",
+  concept: "Concepts", note: "Notes", diagram: "Diagrams",
+  chart: "Data", image: "Data", code: "Code",
+  flashcards: "Recall", glossary: "Recall",
+  video: "Watch", resource: "Read",
+};
+
+function sectionsOf(blocks) {
+  const named = blocks.some((b) => typeof b.section === "string" && b.section.trim());
+  const order = [];
+  const groups = new Map();
+  blocks.forEach((b, i) => {
+    const key = named
+      ? (typeof b.section === "string" && b.section.trim() ? b.section.trim() : "More")
+      : (TYPE_SECTIONS[b.type] ?? "More");
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key).push([b, i]);
+  });
+  return order.map((name) => ({ name, items: groups.get(name) }));
+}
+
+function buildCanvas(blocks) {
+  const viewport = el("div", { class: "canvas-viewport" });
+  const surface = el("div", { class: "canvas-surface" });
+  const edges = document.createElementNS(SVGNS, "svg");
+  edges.setAttribute("class", "canvas-edges");
+  surface.append(edges);
+
+  const sections = sectionsOf(blocks);
+  const frames = [];
+  for (const [si, sec] of sections.entries()) {
+    const cols = sec.items.length === 1 ? 1 : sec.items.length <= 6 ? 2 : 3;
+    const frame = el("div", { class: "canvas-frame", style: `width:${cols * 340 + (cols - 1) * 14 + 36}px` });
+    frame.append(el("div", { class: "canvas-frame-label" }, [
+      el("span", { class: "num" }, [String(si + 1).padStart(2, "0")]),
+      el("span", {}, [sec.name]),
+    ]));
+    const colWrap = el("div", { class: "canvas-cols" });
+    const colEls = Array.from({ length: cols }, () => el("div", { class: "canvas-col" }));
+    sec.items.forEach(([b, i], k) => colEls[k % cols].append(renderBlock(b, i)));
+    colWrap.append(...colEls);
+    frame.append(colWrap);
+    surface.append(frame);
+    frames.push(frame);
+  }
+  viewport.append(surface);
+
+  // ── pan / zoom ──
+  const v = { scale: 0.5, x: 0, y: 0, drag: null, w: 100, h: 100 };
+  const apply = () => {
+    surface.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.scale})`;
+    // Labels and connectors counter-scale, so the wall stays legible zoomed out.
+    surface.style.setProperty("--cscale", String(Math.max(v.scale, 0.08)));
+    pct.textContent = `${Math.round(v.scale * 100)}%`;
+  };
+  const zoomAt = (factor, cx, cy) => {
+    const ns = Math.min(1.5, Math.max(0.08, v.scale * factor));
+    v.x = cx - (cx - v.x) * (ns / v.scale);
+    v.y = cy - (cy - v.y) * (ns / v.scale);
+    v.scale = ns;
+    apply();
+  };
+  const fit = () => {
+    // Whiteboard-style fit: fill the width and let the reader pan down the
+    // rows — shrinking 38 full cards to fit vertically makes everything dust.
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    v.scale = Math.min(0.65, (vw - 60) / v.w);
+    v.x = (vw - v.w * v.scale) / 2;
+    // Shorter than the viewport → center it; taller → start at the top.
+    v.y = Math.max(30, (vh - v.h * v.scale) / 2);
+    apply();
+  };
+  const overview = () => {
+    const vw = viewport.clientWidth, vh = viewport.clientHeight;
+    v.scale = Math.min(1, (vw - 50) / v.w, (vh - 50) / v.h);
+    v.x = (vw - v.w * v.scale) / 2;
+    v.y = (vh - v.h * v.scale) / 2;
+    apply();
+  };
+
+  viewport.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const box = viewport.getBoundingClientRect();
+    zoomAt(e.deltaY < 0 ? 1.12 : 0.89, e.clientX - box.left, e.clientY - box.top);
+  }, { passive: false });
+  let dragged = false;
+  viewport.addEventListener("pointerdown", (e) => {
+    // Pan from anywhere that isn't a genuinely interactive control — charts
+    // and diagrams included, so the wall never feels "stuck".
+    if (e.target.closest("button, a, input, textarea, select, iframe, .fc-card")) return;
+    v.drag = { px: e.clientX, py: e.clientY };
+    dragged = false;
+    viewport.classList.add("dragging");
+    viewport.setPointerCapture(e.pointerId);
+  });
+  viewport.addEventListener("pointermove", (e) => {
+    if (!v.drag) return;
+    const dx = e.clientX - v.drag.px, dy = e.clientY - v.drag.py;
+    if (Math.abs(dx) + Math.abs(dy) > 3) dragged = true;
+    v.x += dx;
+    v.y += dy;
+    v.drag = { px: e.clientX, py: e.clientY };
+    apply();
+  });
+  const endDrag = () => { v.drag = null; viewport.classList.remove("dragging"); };
+  viewport.addEventListener("pointerup", endDrag);
+  viewport.addEventListener("pointercancel", endDrag);
+  // A pan that started on a diagram must not count as a click on it — swallow
+  // the click that follows a real drag before it reaches the zoom handler.
+  viewport.addEventListener("click", (e) => {
+    if (dragged) { e.stopPropagation(); e.preventDefault(); dragged = false; }
+  }, true);
+
+  // ── toolbar ──
+  const pct = el("span", { class: "pct" }, ["50%"]);
+  const mkBtn = (label, fn, title) => {
+    const b = el("button", { title: title ?? label }, [label]);
+    b.addEventListener("click", fn);
+    return b;
+  };
+  const bar = el("div", { class: "canvas-bar no-print" }, [
+    mkBtn("−", () => zoomAt(0.8, viewport.clientWidth / 2, viewport.clientHeight / 2), "Zoom out"),
+    pct,
+    mkBtn("+", () => zoomAt(1.25, viewport.clientWidth / 2, viewport.clientHeight / 2), "Zoom in"),
+    mkBtn("Fit", fit, "Fit the wall's width"),
+    mkBtn("All", overview, "See the whole wall at once"),
+  ]);
+  viewport.append(bar, el("div", { class: "canvas-hint" }, ["drag to pan · scroll to zoom"]));
+
+  // ── layout: place frames in rows once their heights are measurable ──
+  // Wide rows keep the wall close to screen aspect, so "Fit" is readable.
+  const ROW_MAX = 4400, GAP = 150, PAD = 110;
+  let firstLayout = true;
+  const layout = () => {
+    let x = PAD, y = PAD, rowH = 0, maxX = 0;
+    const pos = [];
+    for (const f of frames) {
+      const w = f.offsetWidth, h = f.offsetHeight;
+      if (x > PAD && x + w > ROW_MAX) { x = PAD; y += rowH + GAP; rowH = 0; }
+      f.style.left = `${x}px`;
+      f.style.top = `${y}px`;
+      pos.push({ x, y, w, h });
+      maxX = Math.max(maxX, x + w);
+      x += w + GAP;
+      rowH = Math.max(rowH, h);
+    }
+    v.w = maxX + PAD;
+    v.h = y + rowH + PAD;
+    surface.style.width = `${v.w}px`;
+    surface.style.height = `${v.h}px`;
+    edges.setAttribute("width", v.w);
+    edges.setAttribute("height", v.h);
+
+    // Connectors: right edge of each frame to the left edge of the next.
+    edges.innerHTML = "";
+    for (let i = 0; i < pos.length - 1; i++) {
+      const a = pos[i], b = pos[i + 1];
+      const x1 = a.x + a.w, y1 = a.y + Math.min(a.h / 2, 240);
+      const x2 = b.x, y2 = b.y + Math.min(b.h / 2, 240);
+      const wrapRow = b.x <= a.x;   // the path wrapped to a new row
+      const d = wrapRow
+        ? `M ${x1} ${y1} C ${x1 + 140} ${y1}, ${x2 - 140} ${y2}, ${x2} ${y2}`
+        : `M ${x1} ${y1} C ${x1 + 60} ${y1}, ${x2 - 60} ${y2}, ${x2} ${y2}`;
+      edges.append(svg("path", { d }));
+    }
+    if (firstLayout) { firstLayout = false; fit(); }
+  };
+
+  // Diagrams and math arrive asynchronously and change frame heights, so
+  // re-run layout when anything inside a frame resizes (debounced).
+  requestAnimationFrame(layout);
+  let relayoutTimer = 0;
+  const ro = new ResizeObserver(() => {
+    clearTimeout(relayoutTimer);
+    relayoutTimer = setTimeout(layout, 220);
+  });
+  for (const f of frames) ro.observe(f);
+
+  return viewport;
+}
+
+/* ── Focus mode: one card at a time, in order ──────────────────────── */
+
+const focus = { list: [], i: 0 };
+
+function focusShow() {
+  const stage = $("#focusStage");
+  stage.innerHTML = "";
+  const [block, idx] = focus.list[focus.i];
+  stage.append(renderBlock(block, idx));
+  typesetMath(stage);
+  highlightCode(stage);
+  $("#focusTitle").textContent = state.board?.title ?? "";
+  $("#focusCount").textContent = `${focus.i + 1} / ${focus.list.length}`;
+  $("#focusFill").style.width = `${Math.round(((focus.i + 1) / focus.list.length) * 100)}%`;
+  $("#focusPrev").disabled = focus.i === 0;
+  $("#focusNext").textContent = focus.i === focus.list.length - 1 ? "Done ✓" : "Next →";
+  stage.scrollTop = 0;
+  // Being studied counts as read — this is what feeds the progress bar.
+  setRead(block, true);
+}
+
+function openFocus() {
+  if (!state.board) return;
+  focus.list = visibleBlocks().map((b) => [b, state.board.blocks.indexOf(b)]);
+  if (focus.list.length === 0) return;
+  // Resume where the reader left off: first unread block, else the top.
+  const at = focus.list.findIndex(([b]) => !isRead(b));
+  focus.i = at === -1 ? 0 : at;
+  $("#focusOverlay").hidden = false;
+  focusShow();
+}
+
+function closeFocus() {
+  $("#focusOverlay").hidden = true;
+  $("#focusStage").innerHTML = "";
+  render();   // reflect the read ticks gathered while studying
+}
+
+function focusStep(delta) {
+  const next = focus.i + delta;
+  if (next < 0) return;
+  if (next >= focus.list.length) { closeFocus(); return; }
+  focus.i = next;
+  focusShow();
+}
+
 function render() {
   app.innerHTML = "";
 
@@ -2158,6 +2553,14 @@ function render() {
   meta.append(el("span", { class: "chip" }, [`${visibleBlocks().length || board.blocks.length} blocks`]));
   if (board.createdAt) meta.append(el("span", {}, [new Date(board.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })]));
   hero.append(meta);
+
+  // Reading progress across the whole board.
+  const prow = el("div", { class: "progress-row" });
+  prow.append(
+    el("div", { class: "progress-track" }, [el("div", { class: "progress-fill", "data-readfill": "" })]),
+    el("span", { class: "progress-label", "data-readlabel": "" }),
+  );
+  hero.append(prow);
   app.append(hero);
 
   const main = el("main");
@@ -2176,6 +2579,8 @@ function render() {
       if (b.type === "diagram") flow.append(renderBlock(b, i + 1));
     }
     main.append(flow);
+  } else if (state.view === "canvas") {
+    main.append(buildCanvas(blocks));
   } else {
     const containerClass = { board: "masonry", notes: "notesflow", grid: "gridflow", feed: "feedflow" }[state.view] ?? "masonry";
     const container = el("div", { class: containerClass });
@@ -2220,6 +2625,7 @@ function render() {
   app.append(main);
   typesetMath(app);
   highlightCode(app);
+  updateReadBar();
   syncChrome();
 }
 
@@ -2368,13 +2774,25 @@ researchOverlay.addEventListener("click", (e) => {
   if (e.target === researchOverlay) researchOverlay.hidden = true;
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape") return;
-  // Zoom sits above the panels — close only the topmost thing that's open.
-  if (!$("#zoomOverlay").hidden) { closeZoom(); return; }
-  researchOverlay.hidden = true;
-  reviewOverlay.hidden = true;
+  if (e.key === "Escape") {
+    // Close only the topmost thing that's open.
+    if (!$("#zoomOverlay").hidden) { closeZoom(); return; }
+    if (!$("#focusOverlay").hidden) { closeFocus(); return; }
+    researchOverlay.hidden = true;
+    reviewOverlay.hidden = true;
+    return;
+  }
+  // Arrow keys drive focus mode (but never while typing in a field).
+  if ($("#focusOverlay").hidden) return;
+  if (e.target.closest("input, textarea")) return;
+  if (e.key === "ArrowRight" || e.key === "j") { e.preventDefault(); focusStep(1); }
+  if (e.key === "ArrowLeft" || e.key === "k") { e.preventDefault(); focusStep(-1); }
 });
 wireZoom();
+$("#focusBtn").addEventListener("click", openFocus);
+$("#focusClose").addEventListener("click", closeFocus);
+$("#focusPrev").addEventListener("click", () => focusStep(-1));
+$("#focusNext").addEventListener("click", () => focusStep(1));
 
 /* ── Cross-board spaced-repetition review ──────────────────────────── */
 

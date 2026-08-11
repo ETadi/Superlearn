@@ -95,7 +95,7 @@ Write `.superlearn/boards/<slug>.json`. This is a **teaching artifact for seriou
 
 **You decide the page's structure and visual identity — deliberately, per topic.** Never default to the same layout/theme out of habit. Choose:
 
-- `layout` — the default view: `board` (masonry cards), `notes` (single-column document), `grid` (uniform cards), `mindmap` (map-first), `feed` (full-width sequence).
+- `layout` — the default view: `board` (masonry cards), `notes` (single-column document), `grid` (uniform cards), `mindmap` (map-first), `canvas` (a pannable, zoomable whiteboard — one dashed frame per section, connectors tracing the path), `feed` (full-width sequence).
 - `theme` — `{"preset": "<name>", "accent": "#rrggbb"?}`. Presets are complete visual identities (background, ink scale, typography):
 
 | Preset | Feel | Suits |
@@ -192,6 +192,14 @@ A `chart` block draws a themed, accessible SVG (hover tooltips, legend, and a "S
 - One measure per chart. Two things on different scales are two charts, never two y-axes.
 - Never fabricate figures to make a chart. No data → write a `note` instead.
 
+### Sections — the whiteboard's structure
+
+Give every block a `"section"` — a short label like `"MVCC"` or `"Durability"` naming the chapter it belongs to. Sections become the **frames on the canvas (whiteboard) view**: each one a numbered dashed frame with its blocks inside, connected in reading order across a pannable wall. Rules:
+
+- Short names (≤40 chars), 2–5 blocks per section, ordered foundations → advanced. Keep videos in a `"Watch"` section and resources in a `"Read next"` section.
+- **All or nothing** — a partially sectioned board dumps unlabeled blocks into a generic "More" frame (the validator warns). Boards without any sections still get a canvas, grouped by block type, but authored sections are always better.
+- On boards of ~14+ blocks, consider `"layout": "canvas"` as the default view for topics with strong chapter structure — a systems topic explored subsystem by subsystem is exactly what a whiteboard is for.
+
 ### Cross-board links and user annotations
 
 - Any block may carry `"related": [{"board": "<board-id>", "block": "<block title>", "label": "..."}]` — rendered as navigation chips. **When boards overlap conceptually** (Rust ownership ↔ C++ RAII), add links in both directions so the user's library becomes a connected map.
@@ -229,7 +237,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/serve.py" --boards-dir .superlearn/boards
 Run it in the background so the session stays free. Confirm it's up (`curl -s http://localhost:4321/api/boards`), then tell the user:
 
 - Open **http://localhost:4321** — their board is live, in the layout and theme you designed for the topic.
-- The view switcher (Board / Notes / Grid / Mindmap / Feed) restyles the whole experience.
+- The view switcher (Board / Notes / Grid / Mindmap / Canvas / Feed) restyles the whole experience — **Canvas** lays the entire board out as a whiteboard, one frame per section, pan and zoom like Miro.
+- **Focus** walks the board one card at a time (arrow keys), marking each card read as they go; the ✓ on any card and the progress bar under the title track how much of the board they've covered.
 - Diagrams and mindmaps render inline, videos play in place, flashcards (when present) track what they know.
 - The **Research** button opens the full research trail — plan, notes, and raw scraper output — right in the app; the same files live in `.superlearn/research/`.
 - **Everything is saved on disk**: board JSON in `.superlearn/boards/`, a standalone single-file HTML in `.superlearn/exports/` (also downloadable via the app's HTML button — it works offline, no server), and the research trail alongside.

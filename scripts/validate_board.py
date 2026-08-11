@@ -19,7 +19,7 @@ import urllib.parse
 
 YT_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
-LAYOUTS = {"board", "notes", "grid", "mindmap", "feed"}
+LAYOUTS = {"board", "notes", "grid", "mindmap", "feed", "canvas"}
 DEPTHS = {"overview", "standard", "deep"}
 THEMES = {"midnight", "blueprint", "terminal", "paper", "sepia", "arctic"}
 MODES = {"study", "interview", "research", "documentation"}
@@ -149,6 +149,13 @@ def check_block(b, i: int) -> None:
 
     btype = b.get("type")
     req_str(b, "title", where)
+
+    # Optional section name — groups blocks into frames on the canvas view.
+    section = b.get("section")
+    if section is not None and (
+        not isinstance(section, str) or not section.strip() or len(section) > 40
+    ):
+        err(f"{where}: 'section' must be a short non-empty string (≤40 chars)")
 
     # Optional cross-board links, valid on any block type.
     related = b.get("related")
@@ -296,6 +303,15 @@ def main() -> int:
 
     for i, b in enumerate(blocks):
         check_block(b, i)
+
+    # Sections are all-or-nothing: a partially sectioned board dumps the
+    # unlabeled blocks into a "More" frame on the canvas.
+    sectioned = [b for b in blocks if isinstance(b, dict) and isinstance(b.get("section"), str)]
+    if sectioned and len(sectioned) < len(blocks):
+        warn(
+            f"board: {len(blocks) - len(sectioned)} block(s) have no 'section' "
+            "while others do — they will land in a generic 'More' frame on the canvas"
+        )
 
     sources = board.get("sources", [])
     if isinstance(sources, list):
