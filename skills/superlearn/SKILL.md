@@ -51,7 +51,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_youtube.py" "<topic> tutorial" --l
   --out .superlearn/research/<slug>/raw/<slug>-videos.json
 ```
 
-`scrape_web.py` returns DuckDuckGo results plus extracted article text for the top `--read` hits (raise `--max-chars` for deep runs). `scrape_youtube.py` returns real videoIds, titles, channels and durations. Read both output files. If a scraper returns nothing (network hiccups happen), retry once with a rephrased query, then fall back to your own WebSearch/WebFetch — the pipeline must never stall on a scraper.
+`scrape_web.py` returns DuckDuckGo results plus extracted article text for the top `--read` hits (raise `--max-chars` for deep runs; it retries a second endpoint automatically if the first yields nothing). `scrape_youtube.py` returns real videoIds, titles, channels and durations. Read both output files. If a scraper returns nothing (network hiccups happen), retry once with a rephrased query, then fall back to your own WebSearch/WebFetch — the pipeline must never stall on a scraper.
+
+**The trail stays complete on the fallback path too.** When research comes through WebSearch/WebFetch instead of a scraper, save what you found — the URLs and the key extracts, not just your conclusions — to `research/<slug>/raw/<slug>-fallback-<n>.md`. The Research panel must show the full evidence regardless of which path produced it.
 
 **For paper-driven topics and `research` mode**, also sweep the literature:
 

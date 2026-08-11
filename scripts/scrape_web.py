@@ -66,15 +66,23 @@ def resolve_ddg_url(href: str) -> str | None:
         return None
 
 
-def search_duckduckgo(query: str, limit: int) -> list[dict]:
-    try:
-        page = fetch(
-            "https://html.duckduckgo.com/html/?q=" + urllib.parse.quote(query)
+def _assemble(links: list[tuple[str, str]], snippets: list[str], limit: int) -> list[dict]:
+    results: list[dict] = []
+    seen: set[str] = set()
+    for i, (url, title) in enumerate(links):
+        if url in seen:
+            continue
+        seen.add(url)
+        results.append(
+            {"title": title, "url": url, "snippet": snippets[i] if i < len(snippets) else ""}
         )
-    except Exception as exc:
-        print(f"[scrape_web] search failed: {exc}", file=sys.stderr)
-        return []
+        if len(results) >= limit:
+            break
+    return results
 
+
+def parse_html_results(page: str, limit: int) -> list[dict]:
+    """Parses the html.duckduckgo.com endpoint (class-based markup)."""
     links: list[tuple[str, str]] = []
     for m in re.finditer(
         r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
@@ -92,19 +100,48 @@ def search_duckduckgo(query: str, limit: int) -> list[dict]:
             r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>', page, re.S
         )
     ]
+    return _assemble(links, snippets, limit)
 
-    results = []
-    seen: set[str] = set()
-    for i, (url, title) in enumerate(links):
-        if url in seen:
-            continue
-        seen.add(url)
-        results.append(
-            {"title": title, "url": url, "snippet": snippets[i] if i < len(snippets) else ""}
+
+def parse_lite_results(page: str, limit: int) -> list[dict]:
+    """Parses the lite.duckduckgo.com endpoint (plain-table markup) — a
+    different, simpler page that tends to survive redesigns of the main one."""
+    links: list[tuple[str, str]] = []
+    for m in re.finditer(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', page, re.S):
+        url = resolve_ddg_url(html.unescape(m.group(1)))
+        title = strip_tags(m.group(2))
+        if url and title:
+            links.append((url, title))
+
+    snippets = [
+        strip_tags(m.group(1))
+        for m in re.finditer(
+            r'<td[^>]+class="[^"]*result-snippet[^"]*"[^>]*>(.*?)</td>', page, re.S
         )
-        if len(results) >= limit:
-            break
-    return results
+    ]
+    return _assemble(links, snippets, limit)
+
+
+ENDPOINTS = (
+    ("https://html.duckduckgo.com/html/?q=", parse_html_results),
+    ("https://lite.duckduckgo.com/lite/?q=", parse_lite_results),
+)
+
+
+def search_duckduckgo(query: str, limit: int) -> list[dict]:
+    """Tries the main endpoint, then falls back to the lite one — two
+    independent markups, so one redesign can't zero out search."""
+    for base, parser in ENDPOINTS:
+        try:
+            page = fetch(base + urllib.parse.quote(query))
+        except Exception as exc:
+            print(f"[scrape_web] {base.split('/')[2]} failed: {exc}", file=sys.stderr)
+            continue
+        results = parser(page, limit)
+        if results:
+            return results
+        print(f"[scrape_web] {base.split('/')[2]} returned no results", file=sys.stderr)
+    return []
 
 
 BLOCK_STRIP = re.compile(

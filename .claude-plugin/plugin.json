@@ -1,6 +1,6 @@
 {
   "name": "superlearn",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "The world's most advanced learning system, inside Claude Code. Type /superlearn <topic> — it scrapes the web and YouTube, runs an iterative research loop, designs a page that fits the subject, and serves a local web app for deep learning: research notes, concept deep-dives, diagrams, mindmaps, curated papers and lectures — hot-reloading as you keep prompting the session.",
   "author": {
     "name": "Raiyan Yahya",
