@@ -1,16 +1,57 @@
+<div align="center">
+
 # ✦ Superlearn
 
-**Learn anything, beautifully — from inside Claude Code.**
+**Learn anything, deeply — from inside Claude Code.**
 
-Superlearn is a Claude Code plugin that turns any topic into a deep, visual learning experience. Type what you want to learn; Superlearn scrapes the live web and YouTube, runs an iterative research loop until the topic is fully covered, synthesizes everything into a curated learning board, and serves it in a local web app **designed for that topic** — research notes, concept deep-dives, diagrams and mindmaps, curated papers and long-form articles, learning roadmaps, and embedded lectures. Depth-first, for people who actually want to master things. No quizzes, no gamification.
+Give it a topic. It researches the live web, designs a page that fits the subject,
+and serves you an interactive learning board that keeps growing as you ask for more.
 
-Because it runs inside Claude Code, **it uses your existing Claude subscription** — no API keys to manage, nothing to configure.
+*No API keys. Runs on your Claude Code subscription. Everything saved on your disk.*
+
+</div>
+
+![The Superlearn board view](docs/screenshots/hero-board.png)
+
+---
+
+## What it is
+
+Superlearn is a Claude Code plugin. You type `/superlearn <topic>`; it scrapes the web, YouTube, and arXiv, runs an iterative research loop until the topic is genuinely covered, synthesizes everything into a curated learning board, and launches a local web app to study it in.
+
+It is built for people who want **mastery**, not a summary. There are no quizzes, no streaks, no gamification — the material is research notes, concept deep-dives, diagrams and mindmaps, curated papers, working code, and learning roadmaps. Blocks are as long as the teaching requires and nothing is trimmed.
+
+And it doesn't stop when the page loads: keep talking to the same Claude Code session — *"go deeper on X"*, *"add the original papers"*, *"make it feel more academic"* — and the page updates itself in place within seconds.
+
+## Quick start
+
+**Requirements:** [Claude Code](https://claude.com/claude-code) and Python 3.9+. That's it — every script is Python standard library, so there is nothing to `pip install`.
+
+**Install from the marketplace:**
+
+```
+/plugin marketplace add raiyanyahya/superlearn
+/plugin install superlearn@superlearn-marketplace
+```
+
+**Or run it from a clone:**
+
+```bash
+git clone https://github.com/raiyanyahya/superlearn
+cd your-project
+claude --plugin-dir /path/to/superlearn
+```
+
+**Then just ask:**
 
 ```
 /superlearn transformer neural networks
+/superlearn rust ownership — I already know C++
+/superlearn react hooks for my frontend interview
+/superlearn diffusion models, research mode
 ```
 
-…and a few minutes later:
+A few minutes later:
 
 ```
 ✦ Superlearn is live → http://localhost:4321
@@ -22,110 +63,126 @@ Because it runs inside Claude Code, **it uses your existing Claude subscription*
  /superlearn <topic>
         │
         ▼
- ┌─────────────────┐   Python scrapers (stdlib-only):
- │ 1. SCRAPE       │   DuckDuckGo search · article extraction · YouTube
+ ┌─────────────────┐  Your own files in .superlearn/sources/ (PDFs, docs) are
+ │ 1. SCRAPE       │  read first, then Python scrapers sweep DuckDuckGo,
+ └─────────────────┘  YouTube, and arXiv — token-free, in parallel.
+        ▼
+ ┌─────────────────┐  Claude writes a curriculum plan: a subtopic checklist
+ │ 2. PLAN         │  sized to the topic, foundations → advanced.
  └─────────────────┘
         ▼
- ┌─────────────────┐   Claude plans a curriculum: subtopic checklist
- │ 2. PLAN         │   written to .superlearn/research/plan.md
- └─────────────────┘
+ ┌─────────────────┐  For every subtopic: scrape it, supplement with Claude's
+ │ 3. RESEARCH ⟳   │  own web research, write dense notes, tick the box.
+ └─────────────────┘  Repeat until saturated. Parallel agents on big topics.
         ▼
- ┌─────────────────┐   The loop: scrape each subtopic → supplement with
- │ 3. RESEARCH ⟳   │   Claude's own web research → write dense notes →
- └─────────────────┘   tick the checklist → repeat until saturated.
-        ▼               (parallel researcher agents for big topics)
- ┌─────────────────┐   Claude DESIGNS the page for the topic (layout +
- │ 4. DESIGN &     │   theme), then authors boards/<topic>.json — summary,
- │    AUTHOR       │   roadmap, concepts, Mermaid diagrams, code, notes,
- └─────────────────┘   glossary, real videos & primary sources — and
-        ▼               validates it with the bundled validator.
- ┌─────────────────┐   A local server hosts the Superlearn web app.
- │ 5. SERVE        │   You learn — and keep prompting Claude. The page
- │    & ITERATE ⟳  │   hot-reloads with new material within seconds.
+ ┌─────────────────┐  Claude DESIGNS the page for this subject (layout +
+ │ 4. DESIGN &     │  theme), authors the board — summary, roadmap, concepts,
+ │    AUTHOR       │  diagrams, code, glossary, real videos and papers —
+ └─────────────────┘  then runs it through the schema validator.
+        ▼
+ ┌─────────────────┐  A local server hosts the app. You learn — and keep
+ │ 5. SERVE        │  prompting. The page hot-reloads with new material,
+ │    & ITERATE ⟳  │  badging whatever changed.
  └─────────────────┘
 ```
 
 ## The app
 
-**Claude designs each board's identity.** Six themes — `midnight`, `blueprint` (engineering), `terminal` (programming/infra), `paper` (academic serif), `sepia` (humanities), `arctic` (science/data) — plus an optional custom accent, chosen per topic. Engineering topics arrive on a blueprint grid; philosophy arrives as a sepia document; systems programming arrives in a terminal. Never the same default twice out of habit.
-
-Five layout modes, switchable live:
+### Five layouts, switchable live
 
 | View | What you get |
 |---|---|
-| **Board** | Masonry of learning cards |
+| **Board** | Masonry of learning cards — scan and dive |
 | **Notes** | A single-column document, ordered for reading |
 | **Grid** | Uniform card grid |
-| **Mindmap** | An auto-generated map of the whole territory + every diagram |
+| **Mindmap** | An auto-generated map of the whole territory, plus every diagram |
 | **Feed** | Everything, full-width, in sequence |
 
-Plus: click-to-play video lectures, Mermaid diagrams and mindmaps, code blocks with copy buttons, curated papers/articles as the board's spine, full-text block filtering, JSON export, and print/PDF.
+![Mindmap view](docs/screenshots/view-mindmap.png)
 
-**Made for serious study:**
+### Claude designs the page for the topic
 
-- **Your notes live in the board** — annotate any card with your own words; notes save into the board JSON, survive exports and shares, and Claude reads them on the next iteration ("you wrote *'still don't get lifetimes'* — I rewrote that card").
-- **Real spaced repetition** — flashcards are scheduled with SM-2 (Again/Hard/Good/Easy, growing intervals), and the **Review** button runs everything due *across all your boards*. One click exports any deck as TSV for Anki.
-- **"Updated" badges** — when Claude extends a board, the changed cards are marked on your next visit. Nothing new slips past you.
-- **Cross-board links** — related concepts link between boards (Rust ownership ↔ C++ RAII); your library becomes a connected map, not a pile of pages.
-- **Bring your own sources** — drop PDFs, papers, or internal docs into `.superlearn/sources/` and boards are grounded in *your* material first, the web second. Research mode also sweeps **arXiv** directly (official API) for abstracts, authors, and reading order.
-- **Publish** — `python3 scripts/publish.py` pushes your standalone board HTML to a `gh-pages` branch with a generated index, turning your boards into shareable URLs.
+Six complete visual identities — `midnight`, `blueprint`, `terminal`, `paper`, `sepia`, `arctic` — plus an optional custom accent, chosen per subject. Engineering topics arrive on a blueprint grid; systems programming in a terminal; philosophy as a sepia document. Never the same default twice out of habit.
 
-**Live iteration**: the app polls the server and hot-reloads the open board the moment Claude edits it — keep asking questions in the running Claude Code session ("go deeper on X", "add the original papers", "make it feel more academic") and watch the page update in place.
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/theme-blueprint.png" alt="Blueprint theme"><br><em><code>blueprint</code> — engineering & systems</em></td>
+<td width="50%"><img src="docs/screenshots/theme-terminal.png" alt="Terminal theme"><br><em><code>terminal</code> — programming & infra</em></td>
+</tr>
+</table>
 
-**Nothing is thrown away.** Every run leaves a complete paper trail on disk:
+### Your notes live in the board
 
-```
-.superlearn/
-├── research/    the full research trail — plan, synthesized notes, raw scraper
-│                output. Browsable in the app via the Research button.
-├── boards/      portable board JSON — share with anyone who has the plugin
-└── exports/     standalone single-file HTML — the whole app + board baked into
-                 one file that opens anywhere, offline, no server needed
-```
+Annotate any card in your own words. Notes save **into the board JSON**, survive exports and shares, and Claude reads them on the next iteration — write *"still don't get this"* and ask for a rewrite, and it knows exactly what you meant.
+
+![An annotated card with a cross-board link](docs/screenshots/annotation.png)
+
+### Real spaced repetition
+
+Flashcards are scheduled with SM-2 (Again / Hard / Good / Easy, growing intervals per card). The **Review** button runs everything due **across all your boards** in one session, with a live due count. One click exports any deck as TSV for Anki.
+
+![Cross-board review session](docs/screenshots/review-session.png)
+
+### The full research trail, kept
+
+Every plan, note, and raw scraper dump is saved and browsable in the app — so you can always audit where a claim came from.
+
+![Research trail browser](docs/screenshots/research-trail.png)
+
+### Plus
+
+- **"Updated" badges** on cards Claude changed since your last visit
+- **Cross-board links** — related concepts jump between boards and highlight the target card
+- **Click-to-play video lectures**, Mermaid diagrams, code blocks with copy buttons
+- **Full-text filtering**, JSON export, standalone HTML export, print/PDF
 
 ## Modes
 
-`study` is the default; pass another mode in plain words ("for my interview", "survey the literature", "as a reference") or with `--mode`:
+`study` is the default. Ask for another in plain words (*"for my interview"*, *"survey the literature"*, *"as a reference"*) or with `--mode`. The mode changes **what gets researched** and **how the page presents it** — not just the wording.
 
 | Mode | What changes |
 |---|---|
 | `study` | Balanced conceptual mastery — the default experience |
-| `interview` | Likely questions with strong answers, pitfalls interviewers probe, rapid-recall material, fast-scan layout |
+| `interview` | Likely questions with strong answers, what interviewers listen for, red flags, live-coding katas, fast-scan layout |
 | `research` | Literature map: seminal + recent papers with why-each-matters, state of the field, open problems, reading order |
 | `documentation` | A working reference: code-first usage patterns, configuration tables, gotchas, exact terminology |
 
-## Install
-
-From a marketplace-enabled Claude Code:
+## Everything is saved on your disk
 
 ```
-/plugin marketplace add raiyanyahya/superlearn
-/plugin install superlearn@superlearn-marketplace
+.superlearn/
+├── sources/     ← drop your own PDFs, papers, and docs here; they're read first
+├── research/    the full trail per topic — plan, synthesized notes, raw scraper output
+├── boards/      portable board JSON — share with anyone who has the plugin
+└── exports/     standalone single-file HTML — opens anywhere, offline, no server
 ```
 
-Or clone and load locally:
+Nothing leaves your machine except the research requests themselves. Boards are plain JSON you can read, diff, and version-control.
 
-```bash
-git clone https://github.com/raiyanyahya/superlearn
-claude --plugin-dir ./superlearn
-```
+## Keep iterating
 
-Requirements: Claude Code and Python 3.10+ (stdlib only — the scrapers, validator, and server need nothing installed).
+The session stays live. While the server runs, keep talking to Claude Code:
 
-## Usage
-
-```
-/superlearn quantum computing
-/superlearn the french revolution — deep dive
-/superlearn rust lifetimes, I already know C++
-```
-
-While the server is running you can keep talking to Claude Code — the page updates itself:
-
-- *"Add a section on error correction to my quantum computing board"*
+- *"Add a section on error correction"*
 - *"Go deeper on decoherence — include the original papers"*
-- *"Make it feel more academic"* (theme/layout change, live)
-- *"Build me a second board on quantum hardware"* — boards accumulate; switch between them in the app.
+- *"Make it feel more academic"* (theme and layout change, live)
+- *"Build me a second board on quantum hardware"* — boards accumulate and cross-link
+
+The page picks up each change within seconds and marks what's new.
+
+## Scripts
+
+Every script is standalone, stdlib-only, and usable on its own.
+
+| Script | What it does |
+|---|---|
+| `scrape_web.py` | DuckDuckGo search + readable article extraction (two independent endpoints for resilience) |
+| `scrape_youtube.py` | Real video IDs, titles, channels, durations |
+| `scrape_arxiv.py` | Papers via the official arXiv API — abstracts, authors, PDF links |
+| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, Mermaid hygiene |
+| `export_html.py` | Bakes a board into one self-contained HTML file |
+| `serve.py` | Local app server + boards/research API |
+| `publish.py` | Pushes your exported boards to a `gh-pages` branch with a generated index |
 
 Serve existing boards any time without re-researching:
 
@@ -133,21 +190,30 @@ Serve existing boards any time without re-researching:
 python3 scripts/serve.py --boards-dir .superlearn/boards --port 4321
 ```
 
+## Board format
+
+Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `code`, `video`, `resource`, `flashcards`, `glossary`. Any block may carry your `annotation` and `related` cross-board links.
+
+The full schema and the rules Claude follows live in [`skills/superlearn/SKILL.md`](skills/superlearn/SKILL.md). Validate any board with `python3 scripts/validate_board.py <board.json>`.
+
 ## Repository layout
 
 ```
 .claude-plugin/    plugin + marketplace manifests
-commands/          /superlearn slash command
-skills/superlearn/ the research→author→serve playbook Claude follows
+commands/          the /superlearn slash command
+skills/superlearn/ the research → design → author → serve → iterate playbook
 agents/            parallel subtopic researcher
-scripts/           scrape_web.py · scrape_youtube.py · scrape_arxiv.py · validate_board.py
-                   export_html.py · serve.py · publish.py
+scripts/           scrapers, validator, exporter, server, publisher
 app/               the Superlearn web app (single file, zero build step)
+examples/          a ready-to-serve example board
 ```
 
-## Board format
+## Notes on privacy and security
 
-Boards are plain JSON — a `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks: `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `code`, `video`, `resource`, `flashcards`, `glossary`. The full schema lives in [skills/superlearn/SKILL.md](skills/superlearn/SKILL.md), `scripts/validate_board.py` checks any board against it, and `scripts/export_html.py` bakes any board into a standalone HTML file.
+- **No API keys.** Superlearn runs on your Claude Code subscription; nothing is proxied through a third party.
+- **The server is loopback-only** by default and validates the `Host` header, so a web page can't reach it via DNS rebinding. Bind wider deliberately with `--host` if you want to read boards from your phone.
+- **Board content is treated as untrusted** — it's authored from scraped pages. The app escapes all rendered markdown, refuses non-`http(s)` links, and pins video embeds to validated IDs; exports neutralize the payload for HTML script context.
+- **Research files are served read-only**, with path-traversal protection.
 
 ## License
 
