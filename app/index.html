@@ -341,8 +341,63 @@
   }
   @media (max-width: 760px) { .research-panel { flex-direction: column; } .research-side { width: 100%; max-height: 40%; border-right: 0; border-bottom: 1px solid var(--ink-800); } }
 
+  /* ── Annotations (your notes, saved into the board) ──── */
+  .ann { margin-top: 14px; border-top: 1px dashed var(--ink-700); padding-top: 10px; }
+  .ann-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 6px;
+  }
+  .ann-text { font-size: 13.5px; color: var(--ink-200); line-height: 1.6; font-style: italic; white-space: pre-wrap; }
+  .ann-editctl { background: none; border: 0; color: var(--ink-400); font-size: 11px; cursor: pointer; padding: 2px 8px; border-radius: 6px; }
+  .ann-editctl:hover { color: var(--accent-soft); background: var(--ink-850); }
+  .ann-add { margin-top: 12px; font-size: 11.5px !important; }
+  .card:not(:hover) .ann-add { opacity: .3; }
+  .ann textarea {
+    width: 100%; min-height: 84px; box-sizing: border-box;
+    background: var(--ink-950); color: var(--ink-200);
+    border: 1px solid var(--ink-700); border-radius: 10px; padding: 10px;
+    font: inherit; font-size: 13.5px; resize: vertical;
+  }
+  .ann textarea:focus { outline: none; border-color: var(--accent); }
+  .ann-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .ann-actions .btn { font-size: 12px; padding: 5px 12px; }
+
+  /* ── Spaced repetition ─────────────────────────────────── */
+  .fc-rate { display: flex; gap: 6px; margin-top: 10px; }
+  .fc-rate button { flex: 1; font-size: 12px; padding: 7px 4px; border-radius: 9px; border: 1px solid var(--ink-700); background: var(--ink-850); color: var(--ink-300); }
+  .fc-rate .r-again:hover { border-color: var(--coral); color: var(--coral); }
+  .fc-rate .r-hard:hover  { border-color: var(--gold);  color: var(--gold); }
+  .fc-rate .r-good:hover  { border-color: var(--mint);  color: var(--mint); }
+  .fc-rate .r-easy:hover  { border-color: var(--sky);   color: var(--sky); }
+  .fc-due { font-size: 11px; color: var(--ink-400); text-align: center; margin-top: 6px; }
+  .review-card { max-width: 560px; margin: 0 auto; }
+  .review-src { text-align: center; font-size: 12px; color: var(--ink-400); margin-bottom: 12px; }
+  .review-done { text-align: center; color: var(--ink-300); padding: 60px 20px; font-size: 16px; }
+  .review-done .big { font-size: 44px; margin-bottom: 14px; }
+
+  /* ── What's-new badges ─────────────────────────────────── */
+  .chip.newbadge {
+    color: var(--mint); font-weight: 700; font-size: 10px;
+    letter-spacing: .1em; text-transform: uppercase; padding: 2px 9px;
+    border: 1px solid color-mix(in srgb, var(--mint) 45%, transparent);
+    background: color-mix(in srgb, var(--mint) 10%, transparent);
+    border-radius: 99px; margin-left: auto;
+  }
+  .card.is-new { border-color: color-mix(in srgb, var(--mint) 35%, var(--ink-800)); }
+
+  /* ── Cross-board links ─────────────────────────────────── */
+  .related { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .related button {
+    font-size: 11.5px; border: 1px solid var(--ink-700); background: var(--ink-850);
+    color: var(--accent-soft); border-radius: 99px; padding: 3px 11px;
+  }
+  .related button:hover { border-color: var(--accent); }
+  .card.flash-target { box-shadow: 0 0 0 2px var(--accent) !important; }
+
   /* Embedded (standalone HTML export) mode — no server behind the page. */
-  .embedded #boardPicker, .embedded #researchBtn, .embedded #htmlBtn { display: none; }
+  .embedded #boardPicker, .embedded #researchBtn, .embedded #htmlBtn, .embedded #reviewBtn { display: none; }
+  .embedded .ann-editctl, .embedded .ann-add, .embedded .related { display: none; }
 
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
@@ -375,6 +430,7 @@
   </nav>
   <div class="spacer"></div>
   <input type="search" id="search" placeholder="Filter blocks…" aria-label="Filter blocks" />
+  <button class="btn" id="reviewBtn" title="Spaced-repetition review across all boards">Review</button>
   <button class="btn" id="researchBtn" title="Browse the research trail behind this board">Research</button>
   <button class="btn" id="exportBtn" title="Download board JSON">JSON</button>
   <button class="btn" id="htmlBtn" title="Save a self-contained HTML file of this board">HTML</button>
@@ -396,6 +452,16 @@
       <p class="res-desc">The raw material this board was built from — the plan,
       every synthesized note, and the scraper output. Pick a file.</p>
     </div>
+  </div>
+</div>
+
+<div id="reviewOverlay" class="research-overlay" hidden>
+  <div class="research-panel" style="max-width: 800px; flex-direction: column;">
+    <div class="research-head">
+      <span id="reviewTitle">Review — due across all boards</span>
+      <button id="reviewClose" class="btn" aria-label="Close">✕</button>
+    </div>
+    <div id="reviewBody" class="research-content"></div>
   </div>
 </div>
 
@@ -617,12 +683,88 @@ function renderMermaid(host, source) {
 
 /* ── Progress (localStorage, per board) ────────────────────────────── */
 
-function progressKey() { return `superlearn.progress.${state.board?.id ?? "none"}`; }
-function loadProgress() {
-  try { return JSON.parse(localStorage.getItem(progressKey())) ?? {}; }
+function progressKeyFor(id) { return `superlearn.progress.${id}`; }
+function loadProgressFor(id) {
+  try { return JSON.parse(localStorage.getItem(progressKeyFor(id))) ?? {}; }
   catch { return {}; }
 }
-function saveProgress(p) { localStorage.setItem(progressKey(), JSON.stringify(p)); }
+function saveProgressFor(id, p) { localStorage.setItem(progressKeyFor(id), JSON.stringify(p)); }
+function loadProgress() { return loadProgressFor(state.board?.id ?? "none"); }
+function saveProgress(p) { saveProgressFor(state.board?.id ?? "none", p); }
+
+/* ── Spaced repetition (SM-2-lite) ─────────────────────────────────── */
+
+const DAY = 86400000;
+
+function srsKey(blockKey, front) { return `${blockKey}|${front}`; }
+
+function srsState(progress, key) {
+  return progress.srs?.[key] ?? { ef: 2.5, iv: 0, reps: 0, due: 0 };
+}
+
+/** One review: rating ∈ again|hard|good|easy → next interval + due date. */
+function srsRate(s, rating) {
+  const n = { ...s };
+  if (rating === "again") {
+    n.reps = 0; n.iv = 0;
+    n.ef = Math.max(1.3, n.ef - 0.2);
+    n.due = Date.now() + 10 * 60 * 1000;            // retry in ~10 minutes
+  } else if (rating === "hard") {
+    n.iv = Math.max(1, (n.iv || 1) * 1.2);
+    n.ef = Math.max(1.3, n.ef - 0.15);
+    n.reps += 1; n.due = Date.now() + n.iv * DAY;
+  } else if (rating === "good") {
+    n.iv = n.reps === 0 ? 1 : Math.max(1, (n.iv || 1) * n.ef);
+    n.reps += 1; n.due = Date.now() + n.iv * DAY;
+  } else {                                           // easy
+    n.iv = n.reps === 0 ? 2.5 : Math.max(2, (n.iv || 1) * n.ef * 1.3);
+    n.ef = Math.min(3, n.ef + 0.15);
+    n.reps += 1; n.due = Date.now() + n.iv * DAY;
+  }
+  n.iv = Math.round(n.iv * 10) / 10;
+  return n;
+}
+
+function saveSrs(boardId, key, s) {
+  const p = loadProgressFor(boardId);
+  p.srs = p.srs ?? {};
+  p.srs[key] = s;
+  saveProgressFor(boardId, p);
+}
+
+function dueText(s) {
+  if (!s.reps && !s.due) return "new";
+  const ms = s.due - Date.now();
+  if (ms <= 0) return "due now";
+  if (ms < DAY) return "due in <1d";
+  return `due in ${Math.round(ms / DAY)}d`;
+}
+
+/** Cards due (or never seen) in one flashcards block. */
+function dueCards(boardId, block) {
+  const p = loadProgressFor(boardId);
+  const key = block.id ?? block.title;
+  return (block.cards ?? []).filter((c) => {
+    const s = srsState(p, srsKey(key, c.front));
+    return (s.due ?? 0) <= Date.now();
+  });
+}
+
+/* ── What's-new detection (per board, per browser) ─────────────────── */
+
+function sigOf(block) {
+  const { annotation, ...rest } = block;   // your notes never mark a card "updated"
+  return JSON.stringify(rest);
+}
+
+function computeNewBadges(board) {
+  const key = `superlearn.seen.${board.id}`;
+  let prev = [];
+  try { prev = JSON.parse(localStorage.getItem(key)) ?? []; } catch { /* first visit */ }
+  const sigs = board.blocks.map(sigOf);
+  state.newSigs = new Set(prev.length ? sigs.filter((s) => !prev.includes(s)) : []);
+  try { localStorage.setItem(key, JSON.stringify(sigs)); } catch { /* storage full */ }
+}
 
 /* ── Block renderers ───────────────────────────────────────────────── */
 
@@ -636,12 +778,15 @@ const ACCENTS = ["var(--accent)", "var(--coral)", "var(--mint)", "var(--gold)", 
 
 function renderBlock(block, index) {
   const [icon, label] = KICKERS[block.type] ?? ["•", block.type];
+  const isNew = state.newSigs?.has(sigOf(block));
   const card = el("article", {
-    class: "card",
+    class: "card" + (isNew ? " is-new" : ""),
     style: `--card-accent:${ACCENTS[index % ACCENTS.length]}; animation-delay:${Math.min(index * 45, 500)}ms`,
     "data-type": block.type,
   });
-  card.append(el("div", { class: "kicker" }, [`${icon} ${label}`]));
+  const kicker = el("div", { class: "kicker" }, [`${icon} ${label}`]);
+  if (isNew) kicker.append(el("span", { class: "chip newbadge" }, ["updated"]));
+  card.append(kicker);
   card.append(el("h2", {}, [block.title ?? ""]));
 
   switch (block.type) {
@@ -700,7 +845,128 @@ function renderBlock(block, index) {
     default:
       if (block.markdown) card.append(el("div", { class: "md", html: md2html(block.markdown) }));
   }
+
+  card.append(renderRelated(block));
+  card.append(renderAnnotation(block));
   return card;
+}
+
+/* ── Cross-board links ─────────────────────────────────────────────── */
+
+function renderRelated(block) {
+  const wrap = el("div");
+  if (!Array.isArray(block.related) || block.related.length === 0) return wrap;
+  const row = el("div", { class: "related no-print" });
+  for (const r of block.related) {
+    if (!r || typeof r.board !== "string") continue;
+    const target = state.boards.find((b) => b.id === r.board);
+    const text = r.label ?? `${target?.emoji ?? "↪"} ${r.block ?? target?.title ?? r.board}`;
+    const btn = el("button", { title: `Open ${r.board}${r.block ? " → " + r.block : ""}` }, [`↪ ${text}`]);
+    btn.addEventListener("click", () => navigateRelated(r));
+    row.append(btn);
+  }
+  if (row.childNodes.length) wrap.append(row);
+  return wrap;
+}
+
+async function navigateRelated(r) {
+  if (EMBEDDED) return;
+  if (!state.boards.some((b) => b.id === r.board)) {
+    toast("That board isn't on this server yet");
+    return;
+  }
+  await selectBoard(r.board);
+  if (!r.block) return;
+  setTimeout(() => {
+    const heading = [...document.querySelectorAll("article.card h2")]
+      .find((h) => h.textContent.trim() === r.block);
+    const target = heading?.closest(".card");
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("flash-target");
+    setTimeout(() => target.classList.remove("flash-target"), 2000);
+  }, 300);
+}
+
+/* ── Annotations — your own notes, saved into the board JSON ───────── */
+
+function renderAnnotation(block) {
+  const wrap = el("div");
+
+  const editor = (initial) => {
+    wrap.innerHTML = "";
+    const box = el("div", { class: "ann" });
+    box.append(el("div", { class: "ann-label" }, ["Your note"]));
+    const ta = el("textarea", { placeholder: "Your own words — confusions, connections, aha-moments. Saved into the board itself." });
+    ta.value = initial;
+    box.append(ta);
+    const actions = el("div", { class: "ann-actions no-print" });
+    const save = el("button", { class: "btn" }, ["Save"]);
+    const cancel = el("button", { class: "btn" }, ["Cancel"]);
+    save.addEventListener("click", () => saveAnnotation(block, ta.value.trim()));
+    cancel.addEventListener("click", () => { wrap.innerHTML = ""; wrap.append(display()); });
+    actions.append(save, cancel);
+    if (initial) {
+      const del = el("button", { class: "btn" }, ["Delete note"]);
+      del.addEventListener("click", () => saveAnnotation(block, ""));
+      actions.append(del);
+    }
+    box.append(actions);
+    ta.focus();
+    return box;
+  };
+
+  const display = () => {
+    if (block.annotation) {
+      const box = el("div", { class: "ann" });
+      const labelRow = el("div", { class: "ann-label" }, ["Your note"]);
+      const edit = el("button", { class: "ann-editctl no-print" }, ["edit"]);
+      edit.addEventListener("click", () => { wrap.innerHTML = ""; wrap.append(editor(block.annotation)); });
+      labelRow.append(edit);
+      box.append(labelRow);
+      box.append(el("div", { class: "ann-text" }, [block.annotation]));
+      return box;
+    }
+    const add = el("button", { class: "btn ann-add ann-editctl no-print" }, ["✎ Add note"]);
+    add.addEventListener("click", () => { wrap.innerHTML = ""; wrap.append(editor("")); });
+    return add;
+  };
+
+  wrap.append(display());
+  return wrap;
+}
+
+/** Merge the annotation into the freshest board on disk, then PUT — so a
+    note never clobbers edits Claude made since this page loaded. */
+async function saveAnnotation(block, text) {
+  if (EMBEDDED || !state.board) return;
+  try {
+    const res = await fetch(`/api/boards/${encodeURIComponent(state.board.id)}`);
+    if (!res.ok) throw new Error();
+    const fresh = await res.json();
+    const match = (fresh.blocks ?? []).find(
+      (b) => b.type === block.type && b.title === block.title,
+    );
+    if (!match) throw new Error();
+    if (text) match.annotation = text;
+    else delete match.annotation;
+
+    const put = await fetch(`/api/boards/${encodeURIComponent(state.board.id)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(fresh),
+    });
+    if (!put.ok) throw new Error();
+
+    const scrollY = window.scrollY;
+    state.board = fresh;
+    state.boardRaw = JSON.stringify(fresh);
+    render();
+    window.scrollTo({ top: scrollY });
+    toast(text ? "Note saved into the board" : "Note removed");
+  } catch {
+    toast("Couldn't save the note");
+  }
 }
 
 function hostOf(url) {
@@ -755,14 +1021,13 @@ function renderCode(block) {
 
 function renderFlashcards(block) {
   const cards = block.cards ?? [];
-  const key = block.id ?? block.title;
+  const blockKey = block.id ?? block.title;
+  const boardId = state.board?.id ?? "none";
   const wrap = el("div");
   if (cards.length === 0) return wrap;
 
   let idx = 0;
   let flipped = false;
-  const progress = loadProgress();
-  const known = new Set(progress.flash?.[key] ?? []);
 
   const scene = el("div", { class: "fc-scene" });
   const cardEl = el("div", { class: "fc-card", role: "button", tabindex: "0", "aria-label": "Flip card" });
@@ -772,19 +1037,44 @@ function renderFlashcards(block) {
   scene.append(cardEl);
 
   const count = el("span", { class: "count" });
-  const knowBtn = el("button", { class: "btn" }, ["I know this"]);
+  const dueLine = el("div", { class: "fc-due" });
   const prev = el("button", { class: "btn" }, ["‹"]);
   const next = el("button", { class: "btn" }, ["›"]);
   const shuffle = el("button", { class: "btn" }, ["Shuffle"]);
+  const tsv = el("button", { class: "btn", title: "Export deck as tab-separated values — imports straight into Anki" }, ["Anki"]);
+
+  const rateRow = el("div", { class: "fc-rate no-print" });
+  const ratings = [["again", "Again"], ["hard", "Hard"], ["good", "Good"], ["easy", "Easy"]];
+  for (const [rating, label] of ratings) {
+    const b = el("button", { class: `r-${rating}` }, [label]);
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const c = cards[idx];
+      const k = srsKey(blockKey, c.front);
+      const s = srsRate(srsState(loadProgressFor(boardId), k), rating);
+      saveSrs(boardId, k, s);
+      // advance to the next due card if any, else just the next card
+      const nextDue = cards.findIndex((cc, i) =>
+        i !== idx && (srsState(loadProgressFor(boardId), srsKey(blockKey, cc.front)).due ?? 0) <= Date.now());
+      idx = nextDue >= 0 ? nextDue : (idx + 1) % cards.length;
+      flipped = false;
+      update();
+      updateReviewBadge();
+    });
+    rateRow.append(b);
+  }
 
   const update = () => {
     const c = cards[idx];
+    const p = loadProgressFor(boardId);
+    const s = srsState(p, srsKey(blockKey, c.front));
     front.textContent = c.front;
     back.textContent = c.back;
     cardEl.classList.toggle("flipped", flipped);
-    count.textContent = `${idx + 1} / ${cards.length} · ${known.size} known`;
-    knowBtn.classList.toggle("fc-know", known.has(c.front));
-    knowBtn.textContent = known.has(c.front) ? "Known ✓" : "I know this";
+    rateRow.style.display = flipped ? "flex" : "none";
+    const due = cards.filter((cc) => (srsState(p, srsKey(blockKey, cc.front)).due ?? 0) <= Date.now()).length;
+    count.textContent = `${idx + 1} / ${cards.length} · ${due} due`;
+    dueLine.textContent = `this card: ${dueText(s)}${s.reps ? ` · interval ${s.iv}d` : ""}`;
   };
 
   const flip = () => { flipped = !flipped; update(); };
@@ -799,25 +1089,31 @@ function renderFlashcards(block) {
     }
     idx = 0; flipped = false; update();
   });
-  knowBtn.addEventListener("click", () => {
-    const c = cards[idx];
-    known.has(c.front) ? known.delete(c.front) : known.add(c.front);
-    const p = loadProgress();
-    p.flash = p.flash ?? {};
-    p.flash[key] = [...known];
-    saveProgress(p);
-    update();
-  });
+  tsv.addEventListener("click", () => exportDeckTsv(block));
 
   wrap.append(scene);
-  wrap.append(el("div", { class: "fc-hint" }, ["click card to flip"]));
+  wrap.append(el("div", { class: "fc-hint" }, ["click card to flip · rate after flipping"]));
+  wrap.append(rateRow);
+  wrap.append(dueLine);
   wrap.append(el("div", { class: "fc-nav no-print" }, [
-    el("div", { class: "grp" }, [prev, next, shuffle]),
+    el("div", { class: "grp" }, [prev, next, shuffle, tsv]),
     count,
-    knowBtn,
   ]));
   update();
   return wrap;
+}
+
+/** Tab-separated export — File → Import in Anki picks it up directly. */
+function exportDeckTsv(block) {
+  const clean = (s) => String(s ?? "").replace(/[\t\n\r]+/g, " ").trim();
+  const lines = (block.cards ?? []).map((c) => `${clean(c.front)}\t${clean(c.back)}`);
+  const blob = new Blob([lines.join("\n") + "\n"], { type: "text/tab-separated-values" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${state.board?.id ?? "deck"}-flashcards.tsv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast("Deck exported — import the .tsv straight into Anki");
 }
 
 /* ── Views ─────────────────────────────────────────────────────────── */
@@ -1004,7 +1300,10 @@ async function selectBoard(id, view) {
     state.board = await res.json();
     state.boardRaw = JSON.stringify(state.board);
     state.view = view ?? state.board.layout ?? "board";
+    state.query = "";
+    $("#search").value = "";
     applyTheme(state.board.theme);
+    computeNewBadges(state.board);
     location.hash = `#b=${encodeURIComponent(id)}&v=${state.view}`;
     render();
     window.scrollTo({ top: 0 });
@@ -1073,8 +1372,119 @@ researchOverlay.addEventListener("click", (e) => {
   if (e.target === researchOverlay) researchOverlay.hidden = true;
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") researchOverlay.hidden = true;
+  if (e.key === "Escape") { researchOverlay.hidden = true; reviewOverlay.hidden = true; }
 });
+
+/* ── Cross-board spaced-repetition review ──────────────────────────── */
+
+const reviewOverlay = $("#reviewOverlay");
+$("#reviewBtn").addEventListener("click", openReview);
+$("#reviewClose").addEventListener("click", () => { reviewOverlay.hidden = true; updateReviewBadge(); });
+reviewOverlay.addEventListener("click", (e) => {
+  if (e.target === reviewOverlay) { reviewOverlay.hidden = true; updateReviewBadge(); }
+});
+
+/** Every flashcard due (or never studied) across every board on the server. */
+async function collectDueCards() {
+  const due = [];
+  for (const summary of state.boards) {
+    let board = state.board?.id === summary.id ? state.board : null;
+    if (!board) {
+      try {
+        const res = await fetch(`/api/boards/${encodeURIComponent(summary.id)}`);
+        if (!res.ok) continue;
+        board = await res.json();
+      } catch { continue; }
+    }
+    const p = loadProgressFor(board.id);
+    for (const block of board.blocks ?? []) {
+      if (block.type !== "flashcards") continue;
+      const blockKey = block.id ?? block.title;
+      for (const c of block.cards ?? []) {
+        const k = srsKey(blockKey, c.front);
+        if ((srsState(p, k).due ?? 0) <= Date.now()) {
+          due.push({
+            boardId: board.id, boardTitle: board.title, emoji: board.emoji ?? "🧠",
+            key: k, front: c.front, back: c.back,
+          });
+        }
+      }
+    }
+  }
+  return due;
+}
+
+async function updateReviewBadge() {
+  if (EMBEDDED) return;
+  try {
+    const due = await collectDueCards();
+    $("#reviewBtn").textContent = due.length ? `Review · ${due.length}` : "Review";
+  } catch { /* server briefly away */ }
+}
+
+async function openReview() {
+  const body = $("#reviewBody");
+  body.innerHTML = "";
+  reviewOverlay.hidden = false;
+  body.append(el("p", { class: "res-desc" }, ["Collecting due cards across your boards…"]));
+  const queue = await collectDueCards();
+  // interleave boards so one deck doesn't monopolize the session
+  queue.sort(() => Math.random() - 0.5);
+  renderReviewCard(queue);
+}
+
+function renderReviewCard(queue) {
+  const body = $("#reviewBody");
+  body.innerHTML = "";
+  $("#reviewTitle").textContent = `Review — ${queue.length} card(s) due`;
+
+  if (queue.length === 0) {
+    body.append(el("div", { class: "review-done" }, [
+      el("div", { class: "big" }, ["✦"]),
+      el("div", {}, ["All caught up. Every card across every board is scheduled in the future."]),
+    ]));
+    return;
+  }
+
+  const item = queue[0];
+  let flipped = false;
+
+  const wrap = el("div", { class: "review-card" });
+  wrap.append(el("div", { class: "review-src" }, [`${item.emoji} ${item.boardTitle}`]));
+
+  const scene = el("div", { class: "fc-scene" });
+  const cardEl = el("div", { class: "fc-card", role: "button", tabindex: "0" });
+  const front = el("div", { class: "fc-face fc-front" }, [item.front]);
+  const back = el("div", { class: "fc-face fc-back" }, [item.back]);
+  cardEl.append(front, back);
+  scene.append(cardEl);
+  wrap.append(scene);
+  wrap.append(el("div", { class: "fc-hint" }, ["click to reveal · then rate your recall"]));
+
+  const rateRow = el("div", { class: "fc-rate", style: "display:none" });
+  for (const [rating, label] of [["again", "Again"], ["hard", "Hard"], ["good", "Good"], ["easy", "Easy"]]) {
+    const b = el("button", { class: `r-${rating}` }, [label]);
+    b.addEventListener("click", () => {
+      const s = srsRate(srsState(loadProgressFor(item.boardId), item.key), rating);
+      saveSrs(item.boardId, item.key, s);
+      const rest = queue.slice(1);
+      if (rating === "again") rest.push(item);   // failed cards come back this session
+      renderReviewCard(rest);
+    });
+    rateRow.append(b);
+  }
+  wrap.append(rateRow);
+
+  const flip = () => {
+    flipped = !flipped;
+    cardEl.classList.toggle("flipped", flipped);
+    rateRow.style.display = flipped ? "flex" : "none";
+  };
+  cardEl.addEventListener("click", flip);
+  cardEl.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } });
+
+  body.append(wrap);
+}
 
 async function openResearch() {
   const list = $("#researchList");
@@ -1166,6 +1576,7 @@ async function pollForUpdates() {
         state.board = fresh;
         state.boardRaw = freshRaw;
         applyTheme(fresh.theme);
+        computeNewBadges(fresh);
         render();
         window.scrollTo({ top: scrollY });
         toast("✦ Board updated with new material");
@@ -1190,6 +1601,7 @@ async function pollForUpdates() {
     state.boardRaw = JSON.stringify(EMBEDDED);
     state.view = EMBEDDED.layout ?? "board";
     applyTheme(EMBEDDED.theme);
+    computeNewBadges(EMBEDDED);
     render();
     return;
   }
@@ -1200,6 +1612,7 @@ async function pollForUpdates() {
   if (target) await selectBoard(target, view);
   else render();
 
+  updateReviewBadge();
   setInterval(pollForUpdates, 4000);
 })();
 </script>

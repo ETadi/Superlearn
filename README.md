@@ -59,7 +59,16 @@ Five layout modes, switchable live:
 | **Mindmap** | An auto-generated map of the whole territory + every diagram |
 | **Feed** | Everything, full-width, in sequence |
 
-Plus: click-to-play video lectures, Mermaid diagrams and mindmaps, code blocks with copy buttons, curated papers/articles as the board's spine, optional flashcards for genuinely memorization-heavy domains, full-text block filtering, JSON export, and print/PDF.
+Plus: click-to-play video lectures, Mermaid diagrams and mindmaps, code blocks with copy buttons, curated papers/articles as the board's spine, full-text block filtering, JSON export, and print/PDF.
+
+**Made for serious study:**
+
+- **Your notes live in the board** — annotate any card with your own words; notes save into the board JSON, survive exports and shares, and Claude reads them on the next iteration ("you wrote *'still don't get lifetimes'* — I rewrote that card").
+- **Real spaced repetition** — flashcards are scheduled with SM-2 (Again/Hard/Good/Easy, growing intervals), and the **Review** button runs everything due *across all your boards*. One click exports any deck as TSV for Anki.
+- **"Updated" badges** — when Claude extends a board, the changed cards are marked on your next visit. Nothing new slips past you.
+- **Cross-board links** — related concepts link between boards (Rust ownership ↔ C++ RAII); your library becomes a connected map, not a pile of pages.
+- **Bring your own sources** — drop PDFs, papers, or internal docs into `.superlearn/sources/` and boards are grounded in *your* material first, the web second. Research mode also sweeps **arXiv** directly (official API) for abstracts, authors, and reading order.
+- **Publish** — `python3 scripts/publish.py` pushes your standalone board HTML to a `gh-pages` branch with a generated index, turning your boards into shareable URLs.
 
 **Live iteration**: the app polls the server and hot-reloads the open board the moment Claude edits it — keep asking questions in the running Claude Code session ("go deeper on X", "add the original papers", "make it feel more academic") and watch the page update in place.
 
@@ -131,7 +140,8 @@ python3 scripts/serve.py --boards-dir .superlearn/boards --port 4321
 commands/          /superlearn slash command
 skills/superlearn/ the research→author→serve playbook Claude follows
 agents/            parallel subtopic researcher
-scripts/           scrape_web.py · scrape_youtube.py · validate_board.py · export_html.py · serve.py
+scripts/           scrape_web.py · scrape_youtube.py · scrape_arxiv.py · validate_board.py
+                   export_html.py · serve.py · publish.py
 app/               the Superlearn web app (single file, zero build step)
 ```
 

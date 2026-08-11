@@ -51,7 +51,18 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_youtube.py" "<topic> tutorial" --l
   --out .superlearn/research/<slug>/raw/<slug>-videos.json
 ```
 
-`scrape_web.py` returns DuckDuckGo results plus extracted article text for the top `--read` hits. `scrape_youtube.py` returns real videoIds, titles, channels and durations. Read both output files. If a scraper returns nothing (network hiccups happen), retry once with a rephrased query, then fall back to your own WebSearch/WebFetch — the pipeline must never stall on a scraper.
+`scrape_web.py` returns DuckDuckGo results plus extracted article text for the top `--read` hits (raise `--max-chars` for deep runs). `scrape_youtube.py` returns real videoIds, titles, channels and durations. Read both output files. If a scraper returns nothing (network hiccups happen), retry once with a rephrased query, then fall back to your own WebSearch/WebFetch — the pipeline must never stall on a scraper.
+
+**For paper-driven topics and `research` mode**, also sweep the literature:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_arxiv.py" "<topic>" --limit 10 \
+  --out .superlearn/research/<slug>/raw/<slug>-arxiv.json
+```
+
+It returns titles, abstracts, authors, dates, and PDF links from the official arXiv API — the seeds of the board's reading list.
+
+**User-provided sources come first.** If `.superlearn/sources/` contains files (PDFs, docs, text — you can read PDFs natively), read every relevant one *before* planning, and write a digest to `research/<slug>/notes/00-user-sources.md` citing each file by name. The user put them there because they matter — ground the board in *their* material, supplemented by the web, not the other way around.
 
 ## Phase 2 — Curriculum plan
 
@@ -133,6 +144,11 @@ Every block: `"type"`, `"title"`, plus type-specific fields. Markdown fields sup
 
 A standard board is 12–18 blocks: 1 summary, 1 roadmap, 4–8 concepts, 1–3 diagrams (≥1 mindmap), 1–3 notes, code if technical, 2–4 videos, **4–8 resources** (papers, docs, long-form articles), 1 glossary, flashcards only where recall genuinely matters. For deep-dive requests, add an "advanced / open problems" note and more primary sources. Scale down for "quick overview".
 
+### Cross-board links and user annotations
+
+- Any block may carry `"related": [{"board": "<board-id>", "block": "<block title>", "label": "..."}]` — rendered as navigation chips. **When boards overlap conceptually** (Rust ownership ↔ C++ RAII), add links in both directions so the user's library becomes a connected map.
+- Blocks may carry `"annotation"` — **the user's own note, written from the app. Never edit, remove, or overwrite annotations.** Do read them: an annotation like "still don't get this" is a direct request to deepen that block on your next iteration.
+
 ### Validate — never serve an unvalidated board
 
 ```bash
@@ -167,7 +183,11 @@ Run it in the background so the session stays free. Confirm it's up (`curl -s ht
 - Diagrams and mindmaps render inline, videos play in place, flashcards (when present) track what they know.
 - The **Research** button opens the full research trail — plan, notes, and raw scraper output — right in the app; the same files live in `.superlearn/research/`.
 - **Everything is saved on disk**: board JSON in `.superlearn/boards/`, a standalone single-file HTML in `.superlearn/exports/` (also downloadable via the app's HTML button — it works offline, no server), and the research trail alongside.
+- **Their notes live in the board**: the ✎ button on any card saves their own annotation into the board JSON — it survives exports and shares, and you read it on the next iteration.
+- **Review** runs spaced repetition across every board's flashcards (SM-2 scheduling, due counts on the button); the **Anki** button exports any deck as TSV for their existing Anki setup.
+- **Updated cards are badged** — after you edit the board, changed blocks carry an "updated" chip on their next visit, so nothing new gets missed.
 - **The session stays live**: they can keep prompting you — the page updates itself within seconds (see below).
+- If they ask to **share boards online**: `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/publish.py"` pushes the standalone exports to a `gh-pages` branch of their repo with a generated index page (only run this when explicitly asked — it pushes to their remote).
 
 ## Phase 6 — Iterate with the user (live updates)
 
@@ -179,7 +199,7 @@ Serving the board is not the end — it's the start of a conversation. The app p
 - *"change the look"* / *"make it feel more academic"* → update `theme` and/or `layout`.
 - *"new topic: W"* → run the full pipeline again; boards accumulate and the picker updates live.
 
-Rules for iteration: **edit surgically** — never regenerate the whole board for a local change; keep everything grounded (research before adding claims, and save that research to the trail like any other); **re-run the validator after every edit**; **re-export the standalone HTML** so `.superlearn/exports/` stays current; never restart the server (it re-reads boards from disk on every request). The user's browser updates itself — tell them nothing more than "done, it's on your board".
+Rules for iteration: **edit surgically** — never regenerate the whole board for a local change; keep everything grounded (research before adding claims, and save that research to the trail like any other); **preserve every `annotation` field** (they're the user's own notes — and read them: they tell you exactly where to go deeper); add `related` links when a new board connects to an existing one; **re-run the validator after every edit**; **re-export the standalone HTML** so `.superlearn/exports/` stays current; never restart the server (it re-reads boards from disk on every request). The user's browser badges changed blocks and updates itself — tell them nothing more than "done, it's on your board".
 
 ## Quality bar
 

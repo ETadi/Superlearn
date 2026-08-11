@@ -81,6 +81,20 @@ def check_block(b, i: int) -> None:
     btype = b.get("type")
     req_str(b, "title", where)
 
+    # Optional cross-board links, valid on any block type.
+    related = b.get("related")
+    if related is not None:
+        if not isinstance(related, list):
+            err(f"{where}: 'related' must be an array of links")
+        else:
+            for ri, r in enumerate(related):
+                if not isinstance(r, dict) or not isinstance(r.get("board"), str) or not r["board"]:
+                    err(f"{where}.related[{ri}]: needs a string 'board' (target board id)")
+                elif not all(
+                    isinstance(r.get(f), (str, type(None))) for f in ("block", "label")
+                ):
+                    err(f"{where}.related[{ri}]: 'block' and 'label' must be strings")
+
     if btype in ("summary", "concept", "note"):
         req_str(b, "markdown", where)
     elif btype == "video":
