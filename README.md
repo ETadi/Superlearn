@@ -128,6 +128,16 @@ Every diagram and figure is **click-to-zoom**: full-screen, wheel to scale, drag
 
 ![A diagram opened full-screen](docs/screenshots/diagram-zoom.png)
 
+### Code you can read — and run
+
+Code blocks and markdown fences are **syntax-highlighted** in colors that belong to the board's theme, not a bolted-on stylesheet. Every token was checked to clear 4.5:1 contrast against the tightest code background of the six. Untagged fences stay plain on purpose — auto-detection is confidently wrong on pseudo-code, and miscolored is worse than uncolored.
+
+**JavaScript, Python, and HTML blocks get a Run button** and execute right on the card: JS and HTML instantly, Python on a real CPython via Pyodide (NumPy, pandas, matplotlib, SymPy and friends included). Output streams into a console pane below the code, with timing, and a Stop button that kills an infinite loop without freezing the page.
+
+![Running Python inside a board](docs/screenshots/run-python.png)
+
+The code is **untrusted** — it was authored from scraped pages — so it runs in an iframe with `sandbox="allow-scripts"` and deliberately *without* `allow-same-origin`. The frame gets an opaque origin: it cannot read the app's DOM, its storage, or the boards API, and it cannot rewrite its own sandbox. Results cross back by `postMessage`, matched on frame identity. Blocks that can't work in a browser (a PyTorch example, say) are marked `"runnable": false` and simply don't offer the button.
+
 ### Your notes live in the board
 
 Annotate any card in your own words. Notes save **into the board JSON**, survive exports and shares, and Claude reads them on the next iteration — write *"still don't get this"* and ask for a rewrite, and it knows exactly what you meant.
@@ -150,7 +160,7 @@ Every plan, note, and raw scraper dump is saved and browsable in the app — so 
 
 - **"Updated" badges** on cards Claude changed since your last visit
 - **Cross-board links** — related concepts jump between boards and highlight the target card
-- **Click-to-play video lectures**, code blocks with copy buttons
+- **Click-to-play video lectures**, and copy buttons on every code block
 - **Full-text filtering**, JSON export, print/PDF
 - **Standalone HTML export** — one file that opens anywhere; `--offline` bakes in the diagram and math engines and the board's figures too, so it works on a plane
 
@@ -197,8 +207,8 @@ Every script is standalone, stdlib-only, and usable on its own.
 | `scrape_web.py` | DuckDuckGo search + readable article extraction (two independent endpoints for resilience) |
 | `scrape_youtube.py` | Real video IDs, titles, channels, durations |
 | `scrape_arxiv.py` | Papers via the official arXiv API — abstracts, authors, PDF links |
-| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, Mermaid hygiene |
-| `export_html.py` | Bakes a board into one self-contained HTML file (`--offline` inlines Mermaid, KaTeX and figures) |
+| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, language tags, Mermaid hygiene |
+| `export_html.py` | Bakes a board into one self-contained HTML file (`--offline` inlines Mermaid, KaTeX, highlight.js and figures) |
 | `serve.py` | Local app server + boards/research API |
 | `publish.py` | Pushes your exported boards to a `gh-pages` branch with a generated index |
 

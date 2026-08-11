@@ -71,8 +71,16 @@
     },
     {
       "type": "code",
+      "title": "Attention from scratch — press Run",
+      "language": "python",
+      "code": "import math\n\ndef softmax(row):\n    m = max(row)                      # subtract the max for numerical stability\n    exps = [math.exp(v - m) for v in row]\n    return [e / sum(exps) for e in exps]\n\ndef attention(Q, K, V):\n    \"\"\"Scaled dot-product attention, no libraries.\"\"\"\n    d_k = len(K[0])\n    weights, out = [], []\n    for q in Q:                                       # one query per token\n        scores = [sum(a * b for a, b in zip(q, k)) / math.sqrt(d_k) for k in K]\n        w = softmax(scores)                           # how relevant each token is\n        weights.append(w)\n        out.append([sum(w[j] * V[j][i] for j in range(len(V)))\n                    for i in range(len(V[0]))])       # blend the values\n    return weights, out\n\n# Three tokens in a 2-d space. Token 2's query leans toward token 0's key,\n# so it should end up carrying token 0's value — the \"it -> animal\" case.\nQ = [[3.0, 0.0], [0.0, 3.0], [2.7, 0.9]]\nK = [[3.0, 0.0], [0.0, 3.0], [1.0, 1.0]]\nV = [[10.0, 0.0], [0.0, 10.0], [5.0, 5.0]]\n\nweights, output = attention(Q, K, V)\nfor i, (w, row) in enumerate(zip(weights, output)):\n    top = max(range(len(w)), key=lambda j: w[j])\n    print(f\"token {i}: attends most to token {top} \"\n          f\"(w={w[top]:.2f}) -> [{row[0]:.2f}, {row[1]:.2f}]\")",
+      "explanation": "The same formula as above with nothing hidden: dot products, a scale by \\(\\sqrt{d_k}\\), a softmax, then a weighted blend of the values. Standard library only, so it runs in the browser — press Run and token 2 comes back carrying 94% of token 0's value, which is the \"it → animal\" resolution made arithmetic. Edit the vectors and run it again to watch the weights move."
+    },
+    {
+      "type": "code",
       "title": "Self-attention in 20 lines of PyTorch",
       "language": "python",
+      "runnable": false,
       "code": "import torch\nimport torch.nn.functional as F\n\ndef self_attention(x, W_q, W_k, W_v):\n    \"\"\"x: (seq_len, d_model) — one sequence, no batching for clarity.\"\"\"\n    Q = x @ W_q          # (seq, d_k)  what each token is looking for\n    K = x @ W_k          # (seq, d_k)  what each token contains\n    V = x @ W_v          # (seq, d_v)  what each token contributes\n\n    d_k = Q.shape[-1]\n    scores = Q @ K.T / d_k ** 0.5       # (seq, seq) relevance of j to i\n    weights = F.softmax(scores, dim=-1)  # rows sum to 1\n    return weights @ V                   # blend values by relevance\n\nseq_len, d_model, d_k = 6, 32, 16\nx = torch.randn(seq_len, d_model)\nW_q, W_k, W_v = (torch.randn(d_model, d_k) for _ in range(3))\nprint(self_attention(x, W_q, W_k, W_v).shape)  # torch.Size([6, 16])",
       "explanation": "The entire mechanism is three matrix multiplies, a scale, and a softmax. Causal (GPT-style) attention adds one line: mask the upper triangle of `scores` with `-inf` so tokens can't see the future."
     },

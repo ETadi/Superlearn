@@ -245,9 +245,70 @@
   /* ── Code block ─────────────────────────────────────── */
   .codewrap { position: relative; }
   .codewrap .lang { position: absolute; top: 10px; left: 14px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-400); }
-  .codewrap .copy { position: absolute; top: 7px; right: 8px; font-size: 11px; padding: 4px 10px; border-radius: 7px; background: var(--ink-800); border: 1px solid var(--ink-700); color: var(--ink-300); }
-  .codewrap .copy:hover { color: var(--ink-100); border-color: var(--accent); }
+  /* Copy and Run share one toolbar — neither is positioned on its own. */
+  .codewrap .codebar { position: absolute; top: 7px; right: 8px; display: flex; gap: 6px; z-index: 1; }
+  .codewrap .codebar button { font-size: 11px; padding: 4px 10px; border-radius: 7px; background: var(--ink-800); border: 1px solid var(--ink-700); color: var(--ink-300); }
+  .codewrap .codebar button:hover { color: var(--ink-100); border-color: var(--accent); }
+  .codewrap .codebar .run { color: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, var(--ink-700)); }
   .codewrap pre { background: var(--ink-950); border: 1px solid var(--ink-800); border-radius: 12px; padding: 34px 14px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.65; color: var(--ink-200); }
+
+  /* ── Syntax highlighting ────────────────────────────────
+     Token colors are theme-owned rather than a vendored hljs stylesheet, so
+     highlighting inherits each board's identity. Every token was checked to
+     clear 4.5:1 against the tightest code background in its group (sepia for
+     light, blueprint for dark); comments sit at 4.2:1 as supporting text. */
+  [data-theme="midnight"], [data-theme="blueprint"], [data-theme="terminal"] {
+    --c-key: #c678dd; --c-str: #98c379; --c-num: #d19a66; --c-fn: #61afef;
+    --c-type: #e5c07b; --c-builtin: #56b6c2; --c-com: #7d8799;
+  }
+  [data-theme="paper"], [data-theme="sepia"], [data-theme="arctic"] {
+    --c-key: #a626a4; --c-str: #2e742f; --c-num: #975500; --c-fn: #3362bf;
+    --c-type: #8a5a00; --c-builtin: #0a6e8f; --c-com: #646a74;
+  }
+  .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-doctag,
+  .hljs-operator, .hljs-subst { color: var(--c-key); }
+  .hljs-string, .hljs-regexp, .hljs-char.escape_, .hljs-addition,
+  .hljs-template-tag, .hljs-template-variable { color: var(--c-str); }
+  .hljs-number, .hljs-symbol, .hljs-bullet, .hljs-link,
+  .hljs-selector-attr, .hljs-selector-pseudo { color: var(--c-num); }
+  .hljs-title, .hljs-title.function_, .hljs-section, .hljs-name,
+  .hljs-selector-id, .hljs-selector-class { color: var(--c-fn); }
+  .hljs-title.class_, .hljs-type, .hljs-params, .hljs-variable.constant_,
+  .hljs-attr, .hljs-attribute, .hljs-property { color: var(--c-type); }
+  .hljs-built_in, .hljs-builtin-name, .hljs-meta, .hljs-tag,
+  .hljs-variable.language_ { color: var(--c-builtin); }
+  .hljs-comment, .hljs-quote, .hljs-deletion { color: var(--c-com); font-style: italic; }
+  .hljs-emphasis { font-style: italic; }
+  .hljs-strong { font-weight: 700; }
+
+  /* ── Code runner ────────────────────────────────────────
+     Output from a sandboxed frame — board code is untrusted, so it never
+     shares an origin with the app. */
+  .runpane { margin-top: 8px; border: 1px solid var(--ink-800); border-radius: 12px; background: var(--ink-950); overflow: hidden; }
+  .runpane .runhead {
+    display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+    border-bottom: 1px solid var(--ink-800); font-size: 11px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400);
+  }
+  .runpane .runhead .spacer { flex: 1; }
+  .runpane .runhead button { font-size: 10.5px; letter-spacing: 0; text-transform: none; padding: 3px 9px; border-radius: 6px; background: var(--ink-850); border: 1px solid var(--ink-700); color: var(--ink-300); }
+  .runpane .runhead button:hover { color: var(--ink-100); border-color: var(--accent); }
+  .runpane .status { color: var(--ink-500); font-size: 10.5px; letter-spacing: 0; text-transform: none; }
+  .runpane .status.busy { color: var(--accent-soft); }
+  .runpane .status.failed { color: var(--c-key); }
+  .runout {
+    margin: 0; padding: 11px 13px; max-height: 320px; overflow: auto;
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
+    color: var(--ink-200); white-space: pre-wrap; word-break: break-word;
+  }
+  .runout:empty::before { content: "(no output)"; color: var(--ink-500); font-style: italic; }
+  .runout .l { display: block; }
+  .runout .l-error { color: var(--c-key); }
+  .runout .l-warn { color: var(--c-num); }
+  .runout .l-info { color: var(--c-builtin); }
+  .runout .l-note { color: var(--ink-500); font-style: italic; }
+  .runframe { width: 100%; height: 260px; border: 0; background: #fff; display: block; }
+  .runframe.hidden { position: absolute; width: 0; height: 0; visibility: hidden; }
 
   /* ── Flashcards ─────────────────────────────────────── */
   .fc-scene { perspective: 1200px; }
@@ -720,11 +781,15 @@ function md2html(src) {
     const line = lines[i];
 
     if (line.trim().startsWith("```")) {
+      const info = line.trim().slice(3).trim().split(/\s+/)[0].toLowerCase();
       const buf = [];
       i++;
       while (i < lines.length && !lines[i].trim().startsWith("```")) buf.push(lines[i++]);
       i++;
-      out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+      // Narrow whitelist: the info string is board text, and it lands in an
+      // HTML attribute.
+      const attr = /^[a-z0-9+#_-]{1,20}$/.test(info) ? ` data-lang="${info}"` : "";
+      out.push(`<pre><code${attr}>${esc(buf.join("\n"))}</code></pre>`);
       continue;
     }
 
@@ -876,6 +941,40 @@ function typesetMath(root = document) {
     });
 }
 
+/* ── Syntax highlighting (highlight.js, lazy) ──────────────────────── */
+
+const hljsCache = {};
+const loadHljs = () =>
+  loadLib("hljs", "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js", hljsCache);
+
+/**
+ * Colors `pre code[data-lang]` in place. Only tagged, *recognized* languages
+ * are highlighted — auto-detection guesses confidently and wrongly on the
+ * pseudo-code and shell transcripts that fill learning material, and mangled
+ * color is worse than none. Until highlight.js arrives (or if it never does)
+ * the code is already on screen as plain text.
+ */
+function highlightCode(root = document) {
+  const nodes = [...root.querySelectorAll("pre code[data-lang]:not([data-hl])")];
+  if (nodes.length === 0) return;
+  const finish = (n) => { n.dataset.hl = "1"; };
+  loadHljs()
+    .then((hljs) => {
+      for (const n of nodes) {
+        const lang = (n.dataset.lang || "").toLowerCase();
+        try {
+          if (hljs.getLanguage(lang)) {
+            // hljs escapes the source it wraps, so this is safe to assign.
+            n.innerHTML = hljs.highlight(n.textContent, { language: lang, ignoreIllegals: true }).value;
+            n.classList.add("hljs");
+          }
+        } catch { /* keep the plain text */ }
+        finish(n);
+      }
+    })
+    .catch(() => nodes.forEach(finish));
+}
+
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -918,6 +1017,236 @@ function renderMermaid(host, source, title) {
     .catch(() => {
       host.innerHTML = `<pre style="width:100%;overflow-x:auto;background:var(--ink-950);border:1px solid var(--ink-800);border-radius:12px;padding:14px;font-size:12px;color:var(--ink-300)"><code>${esc(source)}</code></pre>`;
     });
+}
+
+/* ── Code runner (sandboxed) ───────────────────────────────────────────
+   Board code is authored from scraped pages, so it is untrusted. It runs in
+   an iframe with `sandbox="allow-scripts"` and deliberately WITHOUT
+   allow-same-origin: the frame gets an opaque origin, so it cannot read the
+   app's DOM, its localStorage, or the boards API — and it cannot rewrite its
+   own sandbox attribute either, which the two flags together would permit.
+   Everything crosses back as postMessage, matched by frame identity (the
+   origin of a sandboxed frame is the string "null" and proves nothing).
+   Killing the frame kills the code, so an infinite loop is one click away
+   from stopping and never freezes the page.                                */
+
+const RUN_KINDS = {
+  javascript: "js", js: "js", node: "js", nodejs: "js",
+  python: "py", py: "py", python3: "py",
+  html: "html",
+};
+
+/** Which runtime, if any, can execute this block in a browser. */
+function runKindFor(block) {
+  if (block.runnable === false) return null;
+  return RUN_KINDS[String(block.language ?? "").trim().toLowerCase()] ?? null;
+}
+
+// The npm package is flat — pyodide.js sits at the package root, unlike the
+// `full/` layout on pyodide.org. Pinned to a major so patches still arrive.
+const PYODIDE_BASE = "https://cdn.jsdelivr.net/npm/pyodide@314/";
+
+/* The harness that lives inside the sandbox. Written as a plain string so no
+   bundler or escaping games are needed; `<\/script>` keeps the parser from
+   ending our own script tag early. */
+const RUN_HARNESS = `<!doctype html><meta charset="utf-8"><body>
+<script>
+"use strict";
+var post = function (kind, payload) { parent.postMessage(Object.assign({ __sl: 1, kind: kind }, payload), "*"); };
+
+function fmt(v, d) {
+  d = d || 0;
+  if (typeof v === "string") return d ? JSON.stringify(v) : v;
+  if (v === null) return "null";
+  if (v === undefined) return "undefined";
+  var t = typeof v;
+  if (t === "number" || t === "boolean" || t === "bigint" || t === "symbol") return String(v);
+  if (t === "function") return "[Function " + (v.name || "anonymous") + "]";
+  if (v instanceof Error) return v.stack || (v.name + ": " + v.message);
+  if (d > 3) return "…";
+  try {
+    if (Array.isArray(v)) {
+      var head = v.slice(0, 60).map(function (x) { return fmt(x, d + 1); });
+      return "[" + head.join(", ") + (v.length > 60 ? ", … " + (v.length - 60) + " more" : "") + "]";
+    }
+    if (v instanceof Map) return "Map(" + v.size + ") {" + [].concat(Array.from(v).slice(0, 30)).map(function (e) { return fmt(e[0], d + 1) + " => " + fmt(e[1], d + 1); }).join(", ") + "}";
+    if (v instanceof Set) return "Set(" + v.size + ") {" + Array.from(v).slice(0, 30).map(function (x) { return fmt(x, d + 1); }).join(", ") + "}";
+    if (v instanceof Node) return "<" + String(v.nodeName).toLowerCase() + ">";
+    var ks = Object.keys(v);
+    return "{" + ks.slice(0, 40).map(function (k) { return k + ": " + fmt(v[k], d + 1); }).join(", ")
+             + (ks.length > 40 ? ", …" : "") + "}";
+  } catch (e) { return String(v); }
+}
+
+var line = function (level, parts) { post("out", { level: level, text: parts.map(function (p) { return fmt(p); }).join(" ") }); };
+["log", "info", "warn", "error", "debug"].forEach(function (m) {
+  var level = m === "warn" ? "warn" : m === "error" ? "error" : m === "info" || m === "debug" ? "info" : "log";
+  console[m] = function () { line(level, [].slice.call(arguments)); };
+});
+window.onerror = function (msg, src, ln, col, err) { post("failed", { text: err ? fmt(err) : String(msg) }); return true; };
+window.onunhandledrejection = function (e) { post("failed", { text: "Unhandled rejection: " + fmt(e.reason) }); };
+
+function loadScript(src) {
+  return new Promise(function (res, rej) {
+    var s = document.createElement("script");
+    s.src = src; s.onload = res;
+    s.onerror = function () { rej(new Error("could not load " + src)); };
+    document.head.appendChild(s);
+  });
+}
+
+var pyReady = null;
+function getPyodide(base) {
+  if (pyReady) return pyReady;
+  post("status", { text: "downloading the Python runtime…" });
+  pyReady = loadScript(base + "pyodide.js")
+    .catch(function () {
+      throw new Error(
+        "The Python runtime could not be downloaded. It is ~15 MB fetched on " +
+        "first use, so running Python needs an internet connection — unlike " +
+        "JavaScript and HTML, which run entirely offline.");
+    })
+    .then(function () {
+      return loadPyodide({
+        indexURL: base,
+        stdout: function (s) { post("out", { level: "log", text: s }); },
+        stderr: function (s) { post("out", { level: "error", text: s }); },
+      });
+    });
+  return pyReady;
+}
+
+addEventListener("message", function (e) {
+  if (e.source !== parent || !e.data || e.data.type !== "sl-run") return;
+  var code = String(e.data.code || "");
+  var started = Date.now();
+  var finish = function () { post("done", { ms: Date.now() - started }); };
+  var fail = function (err) { post("failed", { text: fmt(err) }); };
+
+  if (e.data.lang === "py") {
+    getPyodide(e.data.pyBase)
+      .then(function (py) {
+        post("status", { text: "running…" });
+        return py.loadPackagesFromImports(code).catch(function () { /* unknown imports fail below, with a real traceback */ })
+          .then(function () { return py.runPythonAsync(code); })
+          .then(function (v) { if (v !== undefined && v !== null) post("out", { level: "log", text: String(v) }); });
+      })
+      .then(finish, fail);
+    return;
+  }
+
+  try {
+    // Wrapped in an async IIFE so top-level await works the way it does in a
+    // modern console.
+    Promise.resolve(new Function("return (async () => {\\n" + code + "\\n})()")())
+      .then(finish, fail);
+  } catch (err) { fail(err); }
+});
+
+post("ready", {});
+<\/script>`;
+
+/** Live frames, so postMessage can be routed by identity rather than origin.
+    Weak, because a hot reload replaces the whole board and the frames go with
+    it — a strong map would hold every dead sandbox window for the session. */
+const runFrames = new WeakMap();
+
+window.addEventListener("message", (e) => {
+  const handler = runFrames.get(e.source);
+  if (!handler || !e.data || e.data.__sl !== 1) return;
+  handler(e.data);
+});
+
+/**
+ * Builds the output pane for one code block and wires its Run button.
+ * A fresh frame per run guarantees clean state and disposes of whatever the
+ * previous run left behind.
+ */
+function attachRunner(block, kind, mountAfter) {
+  const pane = el("div", { class: "runpane no-print", hidden: "" });
+  const status = el("span", { class: "status" });
+  const stop = el("button", {}, ["Stop"]);
+  const clear = el("button", {}, ["Clear"]);
+  const head = el("div", { class: "runhead" }, [
+    kind === "html" ? "Preview" : "Output",
+    el("span", { class: "spacer" }),
+    status, stop, clear,
+  ]);
+  const out = el("pre", { class: "runout" });
+  pane.append(head);
+  if (kind !== "html") pane.append(out);
+  mountAfter.append(pane);
+
+  let frame = null;
+  const setStatus = (text, cls = "") => {
+    status.textContent = text;
+    status.className = `status ${cls}`;
+  };
+  const write = (level, text) => {
+    // `.l` is display:block, so it supplies the line break itself — appending
+    // one would double-space every line.
+    out.append(el("span", { class: `l l-${level}` }, [text.replace(/\n$/, "")]));
+    out.scrollTop = out.scrollHeight;
+  };
+
+  const kill = () => {
+    if (!frame) return;
+    runFrames.delete(frame.contentWindow);
+    frame.remove();
+    frame = null;
+  };
+
+  stop.addEventListener("click", () => {
+    if (!frame) return;
+    kill();
+    setStatus("stopped");
+    if (kind !== "html") write("note", "— stopped —");
+  });
+  clear.addEventListener("click", () => { out.innerHTML = ""; setStatus(""); });
+
+  const run = () => {
+    kill();
+    pane.hidden = false;
+    out.innerHTML = "";
+
+    if (kind === "html") {
+      frame = el("iframe", { class: "runframe", sandbox: "allow-scripts", title: "Live preview" });
+      pane.append(frame);
+      frame.srcdoc = block.code ?? "";
+      setStatus("rendered");
+      return;
+    }
+
+    frame = el("iframe", { class: "runframe hidden", sandbox: "allow-scripts", title: "Code sandbox" });
+    pane.append(frame);
+    setStatus("starting…", "busy");
+
+    // contentWindow only becomes the frame's real window once it has loaded,
+    // so registration waits for that rather than happening up front.
+    frame.addEventListener("load", () => {
+      if (!frame) return;
+      runFrames.set(frame.contentWindow, (msg) => {
+        if (msg.kind === "ready") {
+          setStatus("running…", "busy");
+          frame.contentWindow.postMessage(
+            { type: "sl-run", code: block.code ?? "", lang: kind, pyBase: PYODIDE_BASE }, "*",
+          );
+        } else if (msg.kind === "out") {
+          write(msg.level ?? "log", String(msg.text ?? ""));
+        } else if (msg.kind === "status") {
+          setStatus(String(msg.text ?? ""), "busy");
+        } else if (msg.kind === "done") {
+          setStatus(`finished in ${msg.ms} ms`);
+        } else if (msg.kind === "failed") {
+          write("error", String(msg.text ?? "error"));
+          setStatus("failed", "failed");
+        }
+      });
+    });
+    frame.srcdoc = RUN_HARNESS;
+  };
+
+  return { pane, run };
 }
 
 /* ── Zoom / lightbox (diagrams and figures) ────────────────────────── */
@@ -1649,7 +1978,10 @@ function renderVideo(block) {
 
 function renderCode(block) {
   const wrap = el("div", { class: "codewrap" });
-  wrap.append(el("span", { class: "lang" }, [block.language ?? "code"]));
+  const lang = String(block.language ?? "").trim();
+  wrap.append(el("span", { class: "lang" }, [lang || "code"]));
+
+  const bar = el("div", { class: "codebar no-print" });
   const copy = el("button", { class: "copy" }, ["Copy"]);
   copy.addEventListener("click", () => {
     navigator.clipboard?.writeText(block.code ?? "").then(() => {
@@ -1657,10 +1989,20 @@ function renderCode(block) {
       setTimeout(() => (copy.textContent = "Copy"), 1400);
     });
   });
-  wrap.append(copy);
-  wrap.append(el("pre", {}, [el("code", {}, [block.code ?? ""])]));
+
+  const kind = runKindFor(block);
+  const runBtn = kind
+    ? el("button", { class: "run" }, [kind === "html" ? "▶ Preview" : "▶ Run"])
+    : null;
+  if (runBtn) bar.append(runBtn);
+  bar.append(copy);
+  wrap.append(bar);
+  wrap.append(el("pre", {}, [el("code", { "data-lang": lang.toLowerCase() }, [block.code ?? ""])]));
+
   const out = el("div");
   out.append(wrap);
+  // Mounted after the code so the output pane reads below it.
+  if (runBtn) runBtn.addEventListener("click", attachRunner(block, kind, out).run);
   if (block.explanation) out.append(el("div", { class: "md", style: "margin-top:10px", html: md2html(block.explanation) }));
   return out;
 }
@@ -1877,6 +2219,7 @@ function render() {
 
   app.append(main);
   typesetMath(app);
+  highlightCode(app);
   syncChrome();
 }
 
@@ -2195,6 +2538,7 @@ async function showResearchFile(path, btn) {
     if (path.endsWith(".md")) {
       content.append(el("div", { class: "md", html: md2html(text) }));
       typesetMath(content);
+      highlightCode(content);
     } else if (path.endsWith(".json")) {
       let pretty = text;
       try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { /* keep raw */ }

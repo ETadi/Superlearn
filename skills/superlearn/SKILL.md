@@ -138,7 +138,7 @@ Every block: `"type"`, `"title"`, plus type-specific fields. Markdown fields sup
 | `concept` | `tagline`, `markdown` | One core idea per block, crisply explained with examples. The backbone — 4–8 of these. |
 | `note` | `markdown` | Practical tips, gotchas, mental models. |
 | `diagram` | `mermaid`, `caption` | Valid Mermaid. Prefer `flowchart TD` or `mindmap`. Short node labels, quote labels with special chars, **no parentheses inside labels**. Include at least one `mindmap` diagram mapping the whole topic. |
-| `code` | `language`, `code`, `explanation` | Runnable, idiomatic examples. Only for technical topics. |
+| `code` | `language`, `code`, `explanation` | Runnable, idiomatic examples. Only for technical topics. Tag `language` exactly — see **Code** below. |
 | `video` | `videoId`, `channel`, `reason` | **Only videoIds from the scraper output.** Never invent IDs. `reason` = why this video earns its slot. Prefer lectures and deep talks over pop explainers. |
 | `resource` | `url`, `source`, `description` | **Only URLs from your research.** Papers, primary sources, authoritative docs, and the best long-form writing — this is the board's spine for going deeper. |
 | `chart` | `chart`, `series`, plus `categories`/`points` | Real quantitative data — see **Charts** below. Only with numbers you actually found; never invent a trend line. |
@@ -157,6 +157,22 @@ Any markdown field renders TeX through KaTeX:
 - `$ ... $` — also inline, but only recognized when the content contains `^`, `_`, `{`, `}` or `\`, so "costs $5 to $10" is left alone. When in doubt use `\(…\)`.
 
 Use real math wherever the field uses real math — attention as $\mathrm{softmax}(QK^\top/\sqrt{d_k})V$, not "softmax of Q K transpose over root d k". Escape a literal dollar sign as `\$`.
+
+### Code
+
+Every code block and every fenced block in markdown is syntax-highlighted, in colors that belong to the board's theme.
+
+- **Always tag the language** — `"language": "python"` on a `code` block, and ```` ```python ```` on a markdown fence. An untagged or vague tag (`code`, `text`, `output`) means no highlighting: the app never guesses, because auto-detection is confidently wrong on the pseudo-code and shell transcripts that fill learning material.
+- Use the real name highlight.js knows: `python`, `javascript`, `typescript`, `rust`, `go`, `java`, `c`, `cpp`, `csharp`, `ruby`, `php`, `swift`, `kotlin`, `sql`, `bash`, `json`, `yaml`, `html`, `css`, `diff`.
+
+**`code` blocks in `javascript`, `python`, and `html` get a Run button**, executing in a sandboxed frame right on the card — JS and HTML instantly, Python on Pyodide (a ~15 MB download on first use, so it needs a connection; JS and HTML run offline).
+
+That makes runnable examples worth writing deliberately:
+
+- Make them **self-contained and output-producing** — `print(...)` / `console.log(...)` so running actually shows something. A snippet that defines a function and returns nothing looks broken when run.
+- Only the Python standard library plus the Pyodide package set (numpy, pandas, matplotlib, scipy, sympy, scikit-learn, …) is importable. **`torch`, `tensorflow`, and anything needing native builds or the network will not run.**
+- Set `"runnable": false` on a block that can't work in a browser — a torch example, a snippet needing a real filesystem or server. The block still gets highlighted; it just doesn't offer a broken Run button. Prefer this over letting the user hit a confusing traceback.
+- Where a topic allows it, favor an example that *does* run: an illustrative NumPy version of an algorithm teaches more than an un-runnable framework call.
 
 ### Charts
 
@@ -198,7 +214,7 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/export_html.py" .superlearn/boards/<slug>
 # → .superlearn/exports/<slug>.html
 ```
 
-Add `--offline` when the user wants the file to work with no network at all (on a plane, in an air-gapped environment, as a long-term archive). It inlines Mermaid, KaTeX, and the board's figures — a much bigger file, but diagrams, math, and images all render from the file itself. Downloads are cached in `.superlearn/vendor/` and reused.
+Add `--offline` when the user wants the file to work with no network at all (on a plane, in an air-gapped environment, as a long-term archive). It inlines Mermaid, KaTeX, highlight.js, and the board's figures — a much bigger file, but diagrams, math, highlighting, images, and the JavaScript/HTML runners all work from the file itself. (Python is the one exception: Pyodide fetches its own wasm and stdlib at runtime, so it can't be folded in — the app says so plainly when asked.) Downloads are cached in `.superlearn/vendor/` and reused.
 
 Re-export after any later board edit so the file stays current.
 
@@ -242,4 +258,5 @@ Rules for iteration: **edit surgically** — never regenerate the whole board fo
 - **Deep, not gamified**: this is a tool for people who want mastery. No quizzes, no filler engagement mechanics. Advanced sections, primary sources, open problems, and honest complexity belong on the board.
 - **Taught, not listed**: prefer "here's the idea, here's an example, here's the pitfall" over bullet dumps.
 - **Visual**: at least one mindmap of the whole territory; diagrams wherever structure beats prose; a `chart` wherever the argument rests on numbers; real TeX wherever the field uses real TeX. Every diagram and figure is click-to-zoom, so detail is worth including.
+- **Executable where it can be**: tag every language, and prefer code the reader can actually press Run on — a working example beats a described one.
 - **Designed**: layout and theme chosen for the subject, with the reasoning noted in plan.md — never the same default twice in a row out of habit.

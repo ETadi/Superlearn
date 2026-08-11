@@ -34,6 +34,7 @@ MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"
 KATEX_JS_URL = "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.js"
 KATEX_CSS_URL = "https://cdn.jsdelivr.net/npm/katex@0.16/dist/katex.min.css"
 KATEX_FONT_BASE = "https://cdn.jsdelivr.net/npm/katex@0.16/dist/fonts/"
+HLJS_URL = "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js"
 
 # Both libraries publish a UMD build that defines a global, and the app's
 # loadLib() resolves immediately when the global is already there — so
@@ -158,9 +159,17 @@ def inline_board_images(board: dict, cache_dir: Path) -> dict:
 
 
 def build_vendor_bundle(cache_dir: Path) -> str:
-    """Fetches (or reuses) Mermaid + KaTeX and returns markup to inline."""
+    """Fetches (or reuses) Mermaid, KaTeX and highlight.js; returns markup to
+    inline.
+
+    Pyodide is deliberately not vendored: it is ~15 MB spread over separate
+    wasm and stdlib files that it fetches relative to its own base URL, so it
+    cannot be folded into a single document. JavaScript and HTML code blocks
+    still run in an offline export; Python says so and asks for a connection.
+    """
     mermaid = fetch(MERMAID_URL, cache_dir, "mermaid.min.js").decode("utf-8")
     katex_js = fetch(KATEX_JS_URL, cache_dir, "katex.min.js").decode("utf-8")
+    hljs = fetch(HLJS_URL, cache_dir, "highlight.min.js").decode("utf-8")
     katex_css = fetch(KATEX_CSS_URL, cache_dir, "katex.min.css").decode("utf-8")
     katex_css = inline_katex_css(katex_css, cache_dir)
 
@@ -173,6 +182,7 @@ def build_vendor_bundle(cache_dir: Path) -> str:
         "<style data-katex>" + katex_css + "</style>\n"
         + script(mermaid) + "\n"
         + script(katex_js) + "\n"
+        + script(hljs) + "\n"
     )
 
 
@@ -218,8 +228,9 @@ def main() -> int:
             print(
                 f"ERROR: could not vendor the diagram/math libraries: {exc}\n"
                 f"       Download them into {cache_dir} manually "
-                "(mermaid.min.js, katex.min.js, katex.min.css) and re-run, "
-                "or drop --offline for a CDN-backed export.",
+                "(mermaid.min.js, katex.min.js, katex.min.css, "
+                "highlight.min.js) and re-run, or drop --offline for a "
+                "CDN-backed export.",
                 file=sys.stderr,
             )
             return 1

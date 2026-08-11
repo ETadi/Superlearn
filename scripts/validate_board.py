@@ -24,6 +24,10 @@ DEPTHS = {"overview", "standard", "deep"}
 THEMES = {"midnight", "blueprint", "terminal", "paper", "sepia", "arctic"}
 MODES = {"study", "interview", "research", "documentation"}
 CHART_KINDS = {"line", "bar", "scatter"}
+# Mirrors RUN_KINDS in app/index.html — the languages with a browser runtime.
+RUNNABLE_LANGS = {
+    "javascript", "js", "node", "nodejs", "python", "py", "python3", "html",
+}
 
 errors: list[str] = []
 warnings: list[str] = []
@@ -172,7 +176,21 @@ def check_block(b, i: int) -> None:
             check_mermaid(src, where)
     elif btype == "code":
         req_str(b, "code", where)
-        req_str(b, "language", where)
+        lang = req_str(b, "language", where).strip().lower()
+        # The language tag drives syntax highlighting and decides whether the
+        # block gets a Run button, so a vague tag quietly costs both.
+        if lang in ("code", "text", "plain", "output", "shell-session"):
+            warn(
+                f"{where}: language '{lang}' is not a real language — tag the "
+                "actual one (python, rust, bash, …) so it gets highlighted"
+            )
+        if "runnable" in b and not isinstance(b["runnable"], bool):
+            err(f"{where}: 'runnable' must be true or false")
+        if b.get("runnable") is True and lang not in RUNNABLE_LANGS:
+            warn(
+                f"{where}: runnable:true has no effect for '{lang}' — only "
+                f"{sorted(RUNNABLE_LANGS)} execute in the browser"
+            )
     elif btype == "quiz":
         err(
             f"{where}: quiz blocks are not part of Superlearn — this is a "
