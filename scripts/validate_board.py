@@ -157,6 +157,16 @@ def check_block(b, i: int) -> None:
     ):
         err(f"{where}: 'section' must be a short non-empty string (≤40 chars)")
 
+    # Optional user highlights — text the user marked from the app. Like
+    # annotations, these are the user's own and must never be authored,
+    # edited, or removed by the model.
+    hls = b.get("highlights")
+    if hls is not None:
+        if not isinstance(hls, list) or not all(
+            isinstance(h, str) and h.strip() and len(h) <= 600 for h in hls
+        ):
+            err(f"{where}: 'highlights' must be an array of non-empty strings (≤600 chars)")
+
     # Optional cross-board links, valid on any block type.
     related = b.get("related")
     if related is not None:
@@ -289,6 +299,19 @@ def main() -> int:
             not isinstance(accent, str) or not HEX_COLOR.match(accent)
         ):
             err("board: theme.accent must be a 6-digit hex color like '#8a2d3b'")
+
+    # Optional canvas arrangement — where the user dragged each section's
+    # frame on the whiteboard. User-owned: preserve it, never author it.
+    canvas = board.get("canvas")
+    if canvas is not None:
+        if not isinstance(canvas, dict) or not all(
+            isinstance(k, str)
+            and isinstance(p, dict)
+            and isinstance(p.get("x"), (int, float))
+            and isinstance(p.get("y"), (int, float))
+            for k, p in canvas.items()
+        ):
+            err("board: 'canvas' must map section names to {x, y} positions")
 
     blocks = board.get("blocks")
     if not isinstance(blocks, list) or not blocks:

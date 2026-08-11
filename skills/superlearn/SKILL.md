@@ -202,8 +202,10 @@ Give every block a `"section"` — a short label like `"MVCC"` or `"Durability"`
 
 ### Cross-board links and user annotations
 
-- Any block may carry `"related": [{"board": "<board-id>", "block": "<block title>", "label": "..."}]` — rendered as navigation chips. **When boards overlap conceptually** (Rust ownership ↔ C++ RAII), add links in both directions so the user's library becomes a connected map.
+- Any block may carry `"related": [{"board": "<board-id>", "block": "<block title>", "label": "..."}]` — rendered as navigation chips. **When boards overlap conceptually** (Rust ownership ↔ C++ RAII), add links in both directions so the user's library becomes a connected map — the app's **Library** button draws all boards as a graph with these links as its edges.
 - Blocks may carry `"annotation"` — **the user's own note, written from the app. Never edit, remove, or overwrite annotations.** Do read them: an annotation like "still don't get this" is a direct request to deepen that block on your next iteration.
+- Blocks may carry `"highlights"` — **passages the user selected and marked in the app. User-owned like annotations: never author, edit, or remove them.** Read them as strong signals: a highlighted sentence is what resonated or mattered. Several highlights on one block → go deeper there; a highlighted claim is a good anchor for the next iteration's additions.
+- The board may carry `"canvas"` — **where the user dragged each section's frame on the whiteboard. Preserve it exactly.** When you add a new section, simply omit it from `canvas`; the app auto-places it without disturbing the user's arrangement.
 
 ### Validate — never serve an unvalidated board
 
@@ -258,7 +260,7 @@ Serving the board is not the end — it's the start of a conversation. The app p
 - *"change the look"* / *"make it feel more academic"* → update `theme` and/or `layout`.
 - *"new topic: W"* → run the full pipeline again; boards accumulate and the picker updates live.
 
-Rules for iteration: **edit surgically** — never regenerate the whole board for a local change; keep everything grounded (research before adding claims, and save that research to the trail like any other); **preserve every `annotation` field** (they're the user's own notes — and read them: they tell you exactly where to go deeper); add `related` links when a new board connects to an existing one; **re-run the validator after every edit**; **re-export the standalone HTML** so `.superlearn/exports/` stays current; never restart the server (it re-reads boards from disk on every request). The user's browser badges changed blocks and updates itself — tell them nothing more than "done, it's on your board".
+Rules for iteration: **edit surgically** — never regenerate the whole board for a local change; keep everything grounded (research before adding claims, and save that research to the trail like any other); **preserve every `annotation`, `highlights`, and board-level `canvas` field** (they're the user's own notes, marks, and whiteboard arrangement — and read the notes and highlights: they tell you exactly where to go deeper); add `related` links when a new board connects to an existing one; **re-run the validator after every edit**; **re-export the standalone HTML** so `.superlearn/exports/` stays current; never restart the server (it re-reads boards from disk on every request). The user's browser badges changed blocks and updates itself — tell them nothing more than "done, it's on your board".
 
 ## Quality bar
 

@@ -113,6 +113,8 @@ Canvas view lays the entire board out spatially, like a wall you'd build in Miro
 
 Claude authors the sections (`"section": "MVCC"` on each block), so the frames are real chapters — not type buckets. Boards without sections still get a canvas, grouped by what the blocks are.
 
+And it's **your** wall: grab any frame by its label and drag it where you want it. The arrangement saves into the board JSON, survives reloads and Claude's edits — when Claude adds a new section, it auto-places without disturbing what you arranged. `Reset` re-flows everything.
+
 ![Canvas view — the whole Postgres board as a whiteboard](docs/screenshots/canvas-fit.png)
 
 <div align="center"><em>…and zoomed in, cards are fully live — code runs, diagrams zoom, notes save:</em></div>
@@ -165,11 +167,27 @@ Code blocks and markdown fences are **syntax-highlighted** in colors that belong
 
 The code is **untrusted** — it was authored from scraped pages — so it runs in an iframe with `sandbox="allow-scripts"` and deliberately *without* `allow-same-origin`. The frame gets an opaque origin: it cannot read the app's DOM, its storage, or the boards API, and it cannot rewrite its own sandbox. Results cross back by `postMessage`, matched on frame identity. Blocks that can't work in a browser (a PyTorch example, say) are marked `"runnable": false` and simply don't offer the button.
 
-### Your notes live in the board
+### Your notes — and your highlights — live in the board
 
 Annotate any card in your own words. Notes save **into the board JSON**, survive exports and shares, and Claude reads them on the next iteration — write *"still don't get this"* and ask for a rewrite, and it knows exactly what you meant.
 
 ![An annotated card with a cross-board link](docs/screenshots/annotation.png)
+
+**Select any passage and highlight it.** Highlights save into the board too, and Claude treats them as signal: a highlighted sentence is what resonated, several highlights on one card mean *go deeper here*. Rendering uses the CSS Custom Highlight API, so marking up a card never touches its DOM.
+
+![A highlighted passage inside a card](docs/screenshots/highlight.png)
+
+### The library is a map, not a list
+
+The **Library** button draws every board as a node — emoji, block count, your reading progress — with the cross-board `related` links as edges. Boards that share ideas are visibly connected; click any node to jump. The more you learn, the more the graph fills in.
+
+![The library graph](docs/screenshots/library.png)
+
+### A table of contents that knows what you've read
+
+On wide screens, Notes and Feed views get a **contents rail**: every block, grouped by section, with your read-ticks mirrored as dots. Click to jump; the entry you're reading stays lit.
+
+![The contents rail alongside the notes view](docs/screenshots/toc-rail.png)
 
 ### Real spaced repetition
 
@@ -234,7 +252,7 @@ Every script is standalone, stdlib-only, and usable on its own.
 | `scrape_web.py` | DuckDuckGo search + readable article extraction (two independent endpoints for resilience) |
 | `scrape_youtube.py` | Real video IDs, titles, channels, durations |
 | `scrape_arxiv.py` | Papers via the official arXiv API — abstracts, authors, PDF links |
-| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, language tags, sections, Mermaid hygiene |
+| `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, language tags, sections, highlights, canvas layout, Mermaid hygiene |
 | `export_html.py` | Bakes a board into one self-contained HTML file (`--offline` inlines Mermaid, KaTeX, highlight.js and figures) |
 | `serve.py` | Local app server + boards/research API |
 | `publish.py` | Pushes your exported boards to a `gh-pages` branch with a generated index |
@@ -253,7 +271,7 @@ python3 scripts/serve.py --boards-dir examples --port 4321
 
 ## Board format
 
-Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — each optionally tagged with a `section` that becomes its frame on the whiteboard — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `chart`, `image`, `code`, `video`, `resource`, `flashcards`, `glossary`. Markdown fields render TeX. Any block may carry your `annotation` and `related` cross-board links.
+Boards are plain JSON: `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks — each optionally tagged with a `section` that becomes its frame on the whiteboard. Blocks carry your `annotation` and `highlights`; the board carries your dragged `canvas` arrangement — `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `chart`, `image`, `code`, `video`, `resource`, `flashcards`, `glossary`. Markdown fields render TeX. 
 
 The full schema and the rules Claude follows live in [`skills/superlearn/SKILL.md`](skills/superlearn/SKILL.md). Validate any board with `python3 scripts/validate_board.py <board.json>`.
 

@@ -516,6 +516,65 @@
   .progress-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .35s ease; }
   .progress-label { font-size: 12.5px; color: var(--ink-400); font-variant-numeric: tabular-nums; }
 
+  /* ── Text highlights ────────────────────────────────── */
+  ::highlight(sl-marks) {
+    background-color: color-mix(in srgb, var(--accent) 30%, transparent);
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+  }
+  .hl-pop {
+    position: fixed; z-index: 70; display: flex; gap: 4px;
+    background: var(--ink-900); border: 1px solid var(--ink-700); border-radius: 10px;
+    padding: 5px; box-shadow: 0 10px 30px -10px rgba(0,0,0,.6);
+  }
+  .hl-pop[hidden] { display: none; }
+  .hl-pop button { background: var(--ink-850); border: 1px solid var(--ink-700); color: var(--ink-200);
+                   border-radius: 7px; padding: 5px 12px; font-size: 12.5px; white-space: nowrap; }
+  .hl-pop button:hover { border-color: var(--accent); color: var(--ink-100); }
+  .hl-count { font-size: 11px; color: var(--ink-400); margin-top: 10px; }
+  .hl-count button { background: none; border: none; color: var(--ink-500); font-size: 11px;
+                     text-decoration: underline; cursor: pointer; padding: 0; margin-left: 6px; }
+  .hl-count button:hover { color: var(--accent-soft); }
+
+  /* ── TOC rail (notes + feed, wide screens) ──────────── */
+  .toc-rail {
+    position: fixed; left: 18px; top: 150px; bottom: 24px; width: 232px; z-index: 5;
+    overflow-y: auto; padding-right: 6px; display: none;
+  }
+  @media (min-width: 1580px) { .toc-rail { display: block; } }
+  .toc-rail h4 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .14em;
+                 color: var(--ink-500); margin: 0 0 10px 10px; }
+  .toc-rail a {
+    display: flex; align-items: baseline; gap: 8px; padding: 5px 10px; border-radius: 8px;
+    font-size: 12.5px; color: var(--ink-400); text-decoration: none; line-height: 1.4;
+    border-left: 2px solid transparent;
+  }
+  .toc-rail a:hover { color: var(--ink-200); background: var(--ink-900); }
+  .toc-rail a.active { color: var(--ink-100); background: var(--ink-900); border-left-color: var(--accent); }
+  .toc-rail .dot { flex: none; width: 13px; font-size: 10px; color: var(--ink-700); }
+  .toc-rail a.done .dot { color: var(--accent); }
+  .toc-rail .sec { margin: 12px 0 4px 10px; font-size: 10px; text-transform: uppercase;
+                   letter-spacing: .12em; color: var(--ink-500); }
+  @media print { .toc-rail { display: none; } }
+
+  /* ── Library graph ──────────────────────────────────── */
+  .lib-stage { flex: 1; overflow: auto; display: grid; place-items: center; padding: 20px; }
+  .lib-stage svg { max-width: 100%; height: auto; }
+  .lib-node { cursor: pointer; }
+  .lib-node rect { fill: var(--ink-850); stroke: var(--ink-700); stroke-width: 1.5; rx: 16; }
+  .lib-node:hover rect { stroke: var(--accent); }
+  .lib-node .emoji { font-size: 30px; }
+  .lib-node .ltitle { fill: var(--ink-100); font-size: 15px; font-weight: 700; font-family: var(--font-display); }
+  .lib-node .lmeta { fill: var(--ink-400); font-size: 11.5px; }
+  .lib-node .lbar-track { fill: var(--ink-800); rx: 3; }
+  .lib-node .lbar-fill { fill: var(--accent); rx: 3; }
+  .lib-edge { fill: none; stroke: color-mix(in srgb, var(--accent) 45%, var(--ink-700));
+              stroke-width: 2; stroke-dasharray: 6 6; }
+  .lib-edgelabel { fill: var(--ink-400); font-size: 11px; }
+  .lib-empty { color: var(--ink-400); font-size: 14px; line-height: 1.7; max-width: 480px; text-align: center; }
+
   /* ── Focus mode ─────────────────────────────────────── */
   .focus-overlay {
     position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column;
@@ -695,6 +754,7 @@
   </nav>
   <div class="spacer"></div>
   <input type="search" id="search" placeholder="Filter blocks…" aria-label="Filter blocks" />
+  <button class="btn" id="libBtn" title="Your boards as a connected map">Library</button>
   <button class="btn" id="focusBtn" title="Study one card at a time, in order">Focus</button>
   <button class="btn" id="reviewBtn" title="Spaced-repetition review across all boards">Review</button>
   <button class="btn" id="researchBtn" title="Browse the research trail behind this board">Research</button>
@@ -728,6 +788,18 @@
       <button id="reviewClose" class="btn" aria-label="Close">✕</button>
     </div>
     <div id="reviewBody" class="research-content"></div>
+  </div>
+</div>
+
+<div id="hlPop" class="hl-pop no-print" hidden><button id="hlAct"></button></div>
+
+<div id="libOverlay" class="research-overlay no-print" hidden>
+  <div class="research-panel" style="flex-direction: column;">
+    <div class="research-head">
+      <span>Your library — boards and the links between them</span>
+      <button id="libClose" class="btn" aria-label="Close">✕</button>
+    </div>
+    <div id="libStage" class="lib-stage"></div>
   </div>
 </div>
 
@@ -1485,6 +1557,11 @@ function updateReadBar() {
   for (const lab of document.querySelectorAll("[data-readlabel]")) {
     lab.textContent = read === 0 ? `${total} blocks to work through` : `${read} of ${total} read · ${pct}%`;
   }
+  const byKey = new Map(state.board.blocks.map((b) => [blockKeyOf(b), b]));
+  for (const a of document.querySelectorAll(".toc-rail a[data-key]")) {
+    const b = byKey.get(a.dataset.key);
+    if (b) a.classList.toggle("done", isRead(b));
+  }
 }
 
 /* ── Spaced repetition (SM-2-lite) ─────────────────────────────────── */
@@ -1569,6 +1646,7 @@ function renderBlock(block, index) {
     class: "card" + (isNew ? " is-new" : ""),
     style: `--card-accent:${ACCENTS[index % ACCENTS.length]}; animation-delay:${Math.min(index * 45, 500)}ms`,
     "data-type": block.type,
+    "data-key": blockKeyOf(block),
   });
   const kicker = el("div", { class: "kicker" }, [`${icon} ${label}`]);
   if (isNew) kicker.append(el("span", { class: "chip newbadge" }, ["updated"]));
@@ -1658,6 +1736,21 @@ function renderBlock(block, index) {
 
   card.append(renderRelated(block));
   card.append(renderAnnotation(block));
+
+  // Saved highlights: a quiet count with a clear-all, below the note area.
+  if (Array.isArray(block.highlights) && block.highlights.length > 0) {
+    const row = el("div", { class: "hl-count no-print" }, [
+      `★ ${block.highlights.length} highlight${block.highlights.length > 1 ? "s" : ""}`,
+    ]);
+    const clear = el("button", {}, ["clear"]);
+    clear.addEventListener("click", () => saveBoardPatch((fresh) => {
+      const match = matchBlock(fresh, block);
+      if (!match) return false;
+      delete match.highlights;
+    }, "Highlights cleared"));
+    row.append(clear);
+    card.append(row);
+  }
   return card;
 }
 
@@ -1746,20 +1839,16 @@ function renderAnnotation(block) {
   return wrap;
 }
 
-/** Merge the annotation into the freshest board on disk, then PUT — so a
-    note never clobbers edits Claude made since this page loaded. */
-async function saveAnnotation(block, text) {
-  if (EMBEDDED || !state.board) return;
+/** Merge a patch into the freshest board on disk, then PUT — so a user edit
+    never clobbers edits Claude made since this page loaded. `patch(fresh)`
+    mutates the just-fetched board; return false from it to abort. */
+async function saveBoardPatch(patch, okMsg, { rerender = true } = {}) {
+  if (EMBEDDED || !state.board) return false;
   try {
     const res = await fetch(`/api/boards/${encodeURIComponent(state.board.id)}`);
     if (!res.ok) throw new Error();
     const fresh = await res.json();
-    const match = (fresh.blocks ?? []).find(
-      (b) => b.type === block.type && b.title === block.title,
-    );
-    if (!match) throw new Error();
-    if (text) match.annotation = text;
-    else delete match.annotation;
+    if (patch(fresh) === false) throw new Error();
 
     const put = await fetch(`/api/boards/${encodeURIComponent(state.board.id)}`, {
       method: "PUT",
@@ -1771,16 +1860,146 @@ async function saveAnnotation(block, text) {
     const scrollY = window.scrollY;
     state.board = fresh;
     state.boardRaw = JSON.stringify(fresh);
-    render();
-    window.scrollTo({ top: scrollY });
-    toast(text ? "Note saved into the board" : "Note removed");
+    if (rerender) {
+      render();
+      window.scrollTo({ top: scrollY });
+    }
+    if (okMsg) toast(okMsg);
+    return true;
   } catch {
-    toast("Couldn't save the note");
+    toast("Couldn't save that");
+    return false;
   }
+}
+
+/** Finds this block's counterpart in a freshly fetched copy of the board. */
+function matchBlock(fresh, block) {
+  return (fresh.blocks ?? []).find((b) => b.type === block.type && b.title === block.title);
+}
+
+async function saveAnnotation(block, text) {
+  await saveBoardPatch((fresh) => {
+    const match = matchBlock(fresh, block);
+    if (!match) return false;
+    if (text) match.annotation = text;
+    else delete match.annotation;
+  }, text ? "Note saved into the board" : "Note removed");
 }
 
 function hostOf(url) {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "web"; }
+}
+
+/* ── Text highlights ───────────────────────────────────────────────────
+   Select any passage on a card and save it into the block's `highlights`
+   array — Claude reads them as "this resonated / this mattered to me".
+   Rendering uses the CSS Custom Highlight API, so the DOM is never
+   mutated: we find each saved string in the card's text nodes and
+   register a Range for it.                                              */
+
+const HL_NAME = "sl-marks";
+const canHighlight = typeof CSS !== "undefined" && "highlights" in CSS;
+const squash = (s) => s.replace(/\s+/g, " ").trim();
+
+/** Finds `needle` (whitespace-insensitively) across an element's text nodes
+    and returns a Range, or null. */
+function findTextRange(root, needle) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let full = "";
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    nodes.push({ node: n, start: full.length });
+    full += n.textContent;
+  }
+  // Build a squashed copy with a map back to real offsets.
+  const map = [];
+  let sq = "";
+  let lastSpace = true;
+  for (let i = 0; i < full.length; i++) {
+    const ws = /\s/.test(full[i]);
+    if (ws && lastSpace) continue;
+    sq += ws ? " " : full[i];
+    map.push(i);
+    lastSpace = ws;
+  }
+  const at = sq.indexOf(squash(needle));
+  if (at === -1) return null;
+  const from = map[at], to = map[at + squash(needle).length - 1];
+  const locate = (off) => {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      if (off >= nodes[i].start) return [nodes[i].node, off - nodes[i].start];
+    }
+    return [nodes[0]?.node, 0];
+  };
+  const range = document.createRange();
+  const [sn, so] = locate(from);
+  const [en, eo] = locate(to);
+  if (!sn || !en) return null;
+  range.setStart(sn, so);
+  range.setEnd(en, eo + 1);
+  return range;
+}
+
+/** Re-registers every saved highlight on the page. Called after render. */
+function applyHighlights(root = document) {
+  if (!canHighlight) return;
+  const ranges = [];
+  for (const card of root.querySelectorAll("article.card[data-key]")) {
+    const block = state.board?.blocks.find((b) => blockKeyOf(b) === card.dataset.key);
+    for (const text of block?.highlights ?? []) {
+      const r = findTextRange(card, text);
+      if (r) ranges.push(r);
+    }
+  }
+  CSS.highlights.set(HL_NAME, new Highlight(...ranges));
+}
+
+function wireHighlights() {
+  const pop = $("#hlPop");
+  const act = $("#hlAct");
+  let pending = null;   // { block, text, existing }
+
+  const consider = () => {
+    const sel = window.getSelection();
+    pop.hidden = true;
+    pending = null;
+    if (EMBEDDED) return;   // a baked file has no server to save into
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const text = squash(sel.toString());
+    if (text.length < 3 || text.length > 600) return;
+    const range = sel.getRangeAt(0);
+    const card = range.commonAncestorContainer.parentElement?.closest("article.card[data-key]");
+    if (!card || card.closest(".focus-stage, #reviewBody")) {
+      if (!card) return;
+    }
+    const block = state.board?.blocks.find((b) => blockKeyOf(b) === card.dataset.key);
+    if (!block) return;
+    const existing = (block.highlights ?? []).find((h) => squash(h).includes(text) || text.includes(squash(h)));
+    pending = { block, text, existing };
+    act.textContent = existing ? "✕ Remove highlight" : "★ Highlight";
+    const box = range.getBoundingClientRect();
+    pop.hidden = false;
+    pop.style.left = `${Math.min(Math.max(box.left + box.width / 2 - pop.offsetWidth / 2, 8), window.innerWidth - pop.offsetWidth - 8)}px`;
+    pop.style.top = `${Math.max(box.top - pop.offsetHeight - 8, 8)}px`;
+  };
+  document.addEventListener("pointerup", () => setTimeout(consider, 10));
+  document.addEventListener("keyup", (e) => { if (e.key.startsWith("Arrow") || e.shiftKey) setTimeout(consider, 10); });
+
+  act.addEventListener("click", async () => {
+    if (!pending) return;
+    const { block, text, existing } = pending;
+    pop.hidden = true;
+    window.getSelection()?.removeAllRanges();
+    await saveBoardPatch((fresh) => {
+      const match = matchBlock(fresh, block);
+      if (!match) return false;
+      const list = Array.isArray(match.highlights) ? match.highlights : [];
+      match.highlights = existing
+        ? list.filter((h) => h !== existing)
+        : [...list, text];
+      if (match.highlights.length === 0) delete match.highlights;
+    }, existing ? "Highlight removed" : "Highlighted — Claude will see what struck you");
+  });
 }
 
 /* ── Images ────────────────────────────────────────────────────────── */
@@ -2338,13 +2557,20 @@ function buildCanvas(blocks) {
 
   const sections = sectionsOf(blocks);
   const frames = [];
+  // Frames the user has placed by hand — seeded from the board itself, so an
+  // arrangement survives reloads and Claude's own edits.
+  const manual = new Map(Object.entries(state.board?.canvas ?? {})
+    .filter(([, p]) => p && isFinite(p.x) && isFinite(p.y))
+    .map(([k, p]) => [k, { x: Number(p.x), y: Number(p.y) }]));
   for (const [si, sec] of sections.entries()) {
     const cols = sec.items.length === 1 ? 1 : sec.items.length <= 6 ? 2 : 3;
     const frame = el("div", { class: "canvas-frame", style: `width:${cols * 340 + (cols - 1) * 14 + 36}px` });
-    frame.append(el("div", { class: "canvas-frame-label" }, [
+    frame.dataset.section = sec.name;
+    const label = el("div", { class: "canvas-frame-label", title: "Drag to rearrange — the layout saves into the board" }, [
       el("span", { class: "num" }, [String(si + 1).padStart(2, "0")]),
       el("span", {}, [sec.name]),
-    ]));
+    ]);
+    frame.append(label);
     const colWrap = el("div", { class: "canvas-cols" });
     const colEls = Array.from({ length: cols }, () => el("div", { class: "canvas-col" }));
     sec.items.forEach(([b, i], k) => colEls[k % cols].append(renderBlock(b, i)));
@@ -2428,13 +2654,59 @@ function buildCanvas(blocks) {
     b.addEventListener("click", fn);
     return b;
   };
+  const persist = () => saveBoardPatch((fresh) => {
+    if (manual.size) fresh.canvas = Object.fromEntries(manual);
+    else delete fresh.canvas;
+  }, null, { rerender: false });
+
   const bar = el("div", { class: "canvas-bar no-print" }, [
     mkBtn("−", () => zoomAt(0.8, viewport.clientWidth / 2, viewport.clientHeight / 2), "Zoom out"),
     pct,
     mkBtn("+", () => zoomAt(1.25, viewport.clientWidth / 2, viewport.clientHeight / 2), "Zoom in"),
     mkBtn("Fit", fit, "Fit the wall's width"),
     mkBtn("All", overview, "See the whole wall at once"),
+    mkBtn("Reset", () => {
+      manual.clear();
+      persist();
+      layout();
+      fit();
+      toast("Back to the automatic layout");
+    }, "Forget your arrangement and re-flow"),
   ]);
+
+  // ── frame dragging: grab a frame by its label to rearrange the wall ──
+  let fdrag = null;
+  for (const f of frames) {
+    const label = f.querySelector(".canvas-frame-label");
+    label.style.cursor = "grab";
+    label.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();   // never start a pan underneath
+      fdrag = { frame: f, px: e.clientX, py: e.clientY };
+      label.setPointerCapture(e.pointerId);
+      label.style.cursor = "grabbing";
+    });
+    label.addEventListener("pointermove", (e) => {
+      if (!fdrag || fdrag.frame !== f) return;
+      const dx = (e.clientX - fdrag.px) / v.scale;
+      const dy = (e.clientY - fdrag.py) / v.scale;
+      fdrag.px = e.clientX;
+      fdrag.py = e.clientY;
+      const x = Math.max(0, parseFloat(f.style.left) + dx);
+      const y = Math.max(0, parseFloat(f.style.top) + dy);
+      f.style.left = `${x}px`;
+      f.style.top = `${y}px`;
+      manual.set(f.dataset.section, { x: Math.round(x), y: Math.round(y) });
+    });
+    const drop = () => {
+      if (!fdrag || fdrag.frame !== f) return;
+      fdrag = null;
+      label.style.cursor = "grab";
+      layout();   // recompute bounds + connectors around the new spot
+      persist();  // the arrangement lives in the board JSON
+    };
+    label.addEventListener("pointerup", drop);
+    label.addEventListener("pointercancel", drop);
+  }
   viewport.append(bar, el("div", { class: "canvas-hint" }, ["drag to pan · scroll to zoom"]));
 
   // ── layout: place frames in rows once their heights are measurable ──
@@ -2442,20 +2714,27 @@ function buildCanvas(blocks) {
   const ROW_MAX = 4400, GAP = 150, PAD = 110;
   let firstLayout = true;
   const layout = () => {
-    let x = PAD, y = PAD, rowH = 0, maxX = 0;
+    let x = PAD, y = PAD, rowH = 0;
     const pos = [];
     for (const f of frames) {
       const w = f.offsetWidth, h = f.offsetHeight;
-      if (x > PAD && x + w > ROW_MAX) { x = PAD; y += rowH + GAP; rowH = 0; }
-      f.style.left = `${x}px`;
-      f.style.top = `${y}px`;
-      pos.push({ x, y, w, h });
-      maxX = Math.max(maxX, x + w);
-      x += w + GAP;
-      rowH = Math.max(rowH, h);
+      const own = manual.get(f.dataset.section);
+      let fx, fy;
+      if (own) {
+        // Hand-placed frames keep their spot; only the rest auto-flow.
+        fx = own.x; fy = own.y;
+      } else {
+        if (x > PAD && x + w > ROW_MAX) { x = PAD; y += rowH + GAP; rowH = 0; }
+        fx = x; fy = y;
+        x += w + GAP;
+        rowH = Math.max(rowH, h);
+      }
+      f.style.left = `${fx}px`;
+      f.style.top = `${fy}px`;
+      pos.push({ x: fx, y: fy, w, h });
     }
-    v.w = maxX + PAD;
-    v.h = y + rowH + PAD;
+    v.w = Math.max(...pos.map((p) => p.x + p.w)) + PAD;
+    v.h = Math.max(...pos.map((p) => p.y + p.h)) + PAD;
     surface.style.width = `${v.w}px`;
     surface.style.height = `${v.h}px`;
     edges.setAttribute("width", v.w);
@@ -2489,7 +2768,152 @@ function buildCanvas(blocks) {
   return viewport;
 }
 
-/* ── Focus mode: one card at a time, in order ──────────────────────── */
+/* ── Library graph: every board, and the links between them ────────── */
+
+async function openLibrary() {
+  const overlay = $("#libOverlay");
+  const stage = $("#libStage");
+  stage.innerHTML = "";
+  overlay.hidden = false;
+
+  // Full boards, not summaries — edges live in the blocks' `related` links.
+  const boards = [];
+  for (const s of state.boards) {
+    if (state.board?.id === s.id) { boards.push(state.board); continue; }
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(s.id)}`);
+      if (res.ok) boards.push(await res.json());
+    } catch { /* skip unreachable boards */ }
+  }
+
+  if (boards.length < 2) {
+    stage.append(el("div", { class: "lib-empty" }, [
+      el("div", { style: "font-size:40px; margin-bottom:14px" }, ["🕸"]),
+      el("div", {}, [
+        "The library graph appears once you have two or more boards. ",
+        "Build another with /superlearn — when topics overlap, Claude adds ",
+        "cross-board links and this becomes a connected map of everything you know.",
+      ]),
+    ]));
+    return;
+  }
+
+  // Edge weights: how many blocks in A point at board B.
+  const ids = new Set(boards.map((b) => b.id));
+  const weights = new Map();   // "a→b" → count
+  for (const b of boards) {
+    for (const blk of b.blocks ?? []) {
+      for (const r of blk.related ?? []) {
+        if (r?.board && ids.has(r.board) && r.board !== b.id) {
+          const k = `${b.id}→${r.board}`;
+          weights.set(k, (weights.get(k) ?? 0) + 1);
+        }
+      }
+    }
+  }
+  // Merge directions: an A↔B pair is one edge with the summed count.
+  const edges = new Map();
+  for (const [k, n] of weights) {
+    const [a, b] = k.split("→");
+    const key = [a, b].sort().join("↔");
+    edges.set(key, (edges.get(key) ?? 0) + n);
+  }
+
+  // Circle layout — readable up to a couple dozen boards.
+  const NW = 250, NH = 118;
+  const R = Math.max(230, boards.length * 62);
+  const W = 2 * R + NW + 160, H = 2 * R + NH + 160;
+  const cx = W / 2, cy = H / 2;
+  const posOf = new Map(boards.map((b, i) => {
+    const a = (i / boards.length) * 2 * Math.PI - Math.PI / 2;
+    return [b.id, { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }];
+  }));
+
+  const root = svg("svg", { viewBox: `0 0 ${W} ${H}`, width: Math.min(W, 1100) });
+
+  for (const [key, n] of edges) {
+    const [a, b] = key.split("↔");
+    const p1 = posOf.get(a), p2 = posOf.get(b);
+    if (!p1 || !p2) continue;
+    // Bow the edge toward the centre so parallel edges don't overlap nodes.
+    const mx = (p1.x + p2.x) / 2 + (cx - (p1.x + p2.x) / 2) * 0.35;
+    const my = (p1.y + p2.y) / 2 + (cy - (p1.y + p2.y) / 2) * 0.35;
+    root.append(svg("path", { class: "lib-edge", d: `M ${p1.x} ${p1.y} Q ${mx} ${my} ${p2.x} ${p2.y}` }));
+    root.append(svg("text", {
+      class: "lib-edgelabel", x: (p1.x + mx + p2.x) / 3, y: (p1.y + my + p2.y) / 3 - 6,
+      "text-anchor": "middle",
+    }, [`${n} link${n > 1 ? "s" : ""}`]));
+  }
+
+  for (const b of boards) {
+    const p = posOf.get(b.id);
+    const blocks = (b.blocks ?? []).filter((x) => x.type !== "quiz");
+    const readMap = loadProgressFor(b.id).read ?? {};
+    const read = blocks.filter((x) => readMap[String(x.id ?? x.title ?? "")]).length;
+    const pctv = blocks.length ? read / blocks.length : 0;
+
+    const g = svg("g", { class: "lib-node", transform: `translate(${p.x - NW / 2} ${p.y - NH / 2})`, role: "button" });
+    g.append(svg("rect", { width: NW, height: NH, rx: 16 }));
+    g.append(svg("text", { class: "emoji", x: 20, y: 44 }, [b.emoji ?? "🧠"]));
+    const title = (b.title ?? b.id).length > 24 ? (b.title ?? b.id).slice(0, 23) + "…" : (b.title ?? b.id);
+    g.append(svg("text", { class: "ltitle", x: 62, y: 36 }, [title]));
+    g.append(svg("text", { class: "lmeta", x: 62, y: 58 }, [`${blocks.length} blocks · ${Math.round(pctv * 100)}% read`]));
+    g.append(svg("rect", { class: "lbar-track", x: 20, y: 84, width: NW - 40, height: 7, rx: 3 }));
+    if (pctv > 0) g.append(svg("rect", { class: "lbar-fill", x: 20, y: 84, width: Math.max(4, (NW - 40) * pctv), height: 7, rx: 3 }));
+    g.addEventListener("click", () => {
+      overlay.hidden = true;
+      selectBoard(b.id);
+    });
+    root.append(g);
+  }
+
+  stage.append(root);
+}
+
+/* ── TOC rail: jump navigation for document-shaped views ───────────── */
+
+let tocObserver = null;
+
+function buildToc(main, blocks) {
+  const rail = el("nav", { class: "toc-rail no-print", "aria-label": "Contents" });
+  rail.append(el("h4", {}, ["On this board"]));
+  const cards = [...main.querySelectorAll("article.card")];
+  const byKey = new Map(blocks.map((b) => [blockKeyOf(b), b]));
+  let lastSection = null;
+  const links = [];
+  for (const card of cards) {
+    const block = byKey.get(card.dataset.key);
+    if (!block) continue;
+    if (block.section && block.section !== lastSection) {
+      rail.append(el("div", { class: "sec" }, [block.section]));
+      lastSection = block.section;
+    }
+    const a = el("a", {
+      href: "#", class: isRead(block) ? "done" : "", "data-key": card.dataset.key,
+    }, [
+      el("span", { class: "dot" }, ["●"]),
+      el("span", {}, [block.title ?? ""]),
+    ]);
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    rail.append(a);
+    links.push([a, card]);
+  }
+
+  // The entry whose card is nearest the top of the viewport lights up.
+  tocObserver?.disconnect();
+  tocObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const link = links.find(([, c]) => c === entry.target)?.[0];
+      if (link) link.classList.toggle("active", entry.isIntersecting);
+    }
+  }, { rootMargin: "-10% 0px -70% 0px" });
+  for (const [, card] of links) tocObserver.observe(card);
+
+  return rail;
+}
 
 const focus = { list: [], i: 0 };
 
@@ -2623,8 +3047,12 @@ function render() {
   }
 
   app.append(main);
+  if (["notes", "feed"].includes(state.view) && blocks.length > 4) {
+    app.append(buildToc(main, blocks));
+  }
   typesetMath(app);
   highlightCode(app);
+  applyHighlights(app);
   updateReadBar();
   syncChrome();
 }
@@ -2780,6 +3208,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("#focusOverlay").hidden) { closeFocus(); return; }
     researchOverlay.hidden = true;
     reviewOverlay.hidden = true;
+    $("#libOverlay").hidden = true;
     return;
   }
   // Arrow keys drive focus mode (but never while typing in a field).
@@ -2789,6 +3218,10 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft" || e.key === "k") { e.preventDefault(); focusStep(-1); }
 });
 wireZoom();
+wireHighlights();
+$("#libBtn").addEventListener("click", openLibrary);
+$("#libClose").addEventListener("click", () => ($("#libOverlay").hidden = true));
+$("#libOverlay").addEventListener("click", (e) => { if (e.target === $("#libOverlay")) $("#libOverlay").hidden = true; });
 $("#focusBtn").addEventListener("click", openFocus);
 $("#focusClose").addEventListener("click", closeFocus);
 $("#focusPrev").addEventListener("click", () => focusStep(-1));
@@ -3014,6 +3447,7 @@ async function pollForUpdates() {
   if (EMBEDDED) {
     // Standalone HTML export: one baked-in board, no server, no polling.
     document.body.classList.add("embedded");
+    $("#libBtn").style.display = "none";
     state.boards = [{
       id: EMBEDDED.id, title: EMBEDDED.title, emoji: EMBEDDED.emoji,
       topic: EMBEDDED.topic, blockCount: (EMBEDDED.blocks ?? []).length,
