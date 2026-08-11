@@ -7,7 +7,20 @@ description: Build an interactive learning board on any topic. Use when the user
 
 You are the engine of Superlearn: expert educator, researcher, and information designer. Your job is to take a topic and produce a **complete, grounded, beautiful learning board**, then serve it in the Superlearn web app.
 
-The pipeline has five phases. Do not skip phases; do not author the board before research is saturated.
+The pipeline has six phases. Do not skip phases; do not author the board before research is saturated.
+
+## Modes
+
+Superlearn has four modes. **Default is `study`** unless the user asks otherwise — detect phrases like "for my interview", "interview prep", "research mode", "survey the literature", "as documentation", "as a reference", or an explicit `--mode <m>`. The mode shapes **what you capture** during research and **how the board presents it**; record it as `"mode"` in the board JSON (it's shown on the page).
+
+| Mode | Research emphasis | Board shape |
+|---|---|---|
+| `study` | Balanced conceptual mastery — foundations to advanced. | The standard mix below. |
+| `interview` | What interviewers actually probe: search "<topic> interview questions", "commonly asked", real experience threads. Capture the questions *and* what a strong answer contains. | Crisp concept explainers, Q&A `note` blocks (likely question → strong answer → what interviewers listen for), pitfalls/red-flags note, flashcards for rapid recall, short code exercises if technical. Layout `grid`/`board` for fast scanning. |
+| `research` | Map the literature and the frontier: surveys, seminal + recent papers, "state of the art", "open problems", key groups/labs. | Resource-heavy (papers with why-each-matters), state-of-the-field summary, open-problems note, a roadmap through the literature (what to read in what order), timeline diagram of the field. Layout `notes`, theme `paper`/`arctic`. |
+| `documentation` | Working reference material: official docs, API references, configuration, changelogs, migration guides, gotcha threads. | Code-first: usage patterns per task, configuration tables in markdown, gotchas notes, minimal videos, glossary of exact terms. Layout `notes`/`grid`, theme `terminal`/`blueprint`. |
+
+Mode also tunes your scraper queries in Phases 1 and 3 — an `interview` run scrapes different material than a `research` run on the same topic.
 
 ## Phase 0 — Workspace
 
@@ -19,10 +32,13 @@ Create this layout in the current working directory (keep it out of git — it's
 │   ├── plan.md          # curriculum plan + subtopic checklist
 │   ├── raw/             # scraper output (JSON)
 │   └── notes/           # your synthesized notes, one file per subtopic
-└── boards/              # finished board JSONs the app serves
+├── boards/              # finished board JSONs the app serves
+└── exports/             # standalone self-contained HTML files
 ```
 
 Derive a short kebab-case `slug` from the topic (e.g. "transformer neural networks" → `transformer-neural-networks`). Reuse the workspace if it exists; a new topic is a new board file, not a new workspace.
+
+**The research trail is a deliverable, not scratch.** Everything you collect stays on disk — the plan, every notes file, every scraper dump — and the web app exposes it through the **Research** button (the server serves `research/` read-only). Write notes knowing the user will read them.
 
 ## Phase 1 — Initial sweep (scrape first, think second)
 
@@ -89,6 +105,7 @@ Match structure to the material: a history topic reads best as `notes`/`feed` in
   "title": "<compelling title, ≤60 chars>",
   "emoji": "<one emoji>",
   "createdAt": "<ISO 8601>",
+  "mode": "study | interview | research | documentation",
   "depth": "standard",
   "layout": "<your deliberate choice>",
   "theme": { "preset": "<your deliberate choice>", "accent": "#8a2d3b" },
@@ -122,7 +139,18 @@ A standard board is 12–18 blocks: 1 summary, 1 roadmap, 4–8 concepts, 1–3 
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/validate_board.py" .superlearn/boards/<slug>.json
 ```
 
-Fix every error and warning it reports (it checks schema, videoId formats, URL validity, quiz answer indices, and Mermaid smells). Re-run until clean.
+Fix every error and warning it reports (it checks schema, mode/theme values, videoId formats, URL validity, and Mermaid smells). Re-run until clean.
+
+### Export the standalone HTML
+
+After validation passes, bake a self-contained HTML file — the whole app plus the board in one file that opens anywhere with no server:
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/export_html.py" .superlearn/boards/<slug>.json
+# → .superlearn/exports/<slug>.html
+```
+
+Re-export after any later board edit so the file stays current.
 
 ## Phase 5 — Serve and hand over
 
@@ -137,8 +165,9 @@ Run it in the background so the session stays free. Confirm it's up (`curl -s ht
 - Open **http://localhost:4321** — their board is live, in the layout and theme you designed for the topic.
 - The view switcher (Board / Notes / Grid / Mindmap / Feed) restyles the whole experience.
 - Diagrams and mindmaps render inline, videos play in place, flashcards (when present) track what they know.
+- The **Research** button opens the full research trail — plan, notes, and raw scraper output — right in the app; the same files live in `.superlearn/research/`.
+- **Everything is saved on disk**: board JSON in `.superlearn/boards/`, a standalone single-file HTML in `.superlearn/exports/` (also downloadable via the app's HTML button — it works offline, no server), and the research trail alongside.
 - **The session stays live**: they can keep prompting you — the page updates itself within seconds (see below).
-- Boards live in `.superlearn/boards/` as portable JSON they can share; anyone with the plugin can drop a board file in and serve it.
 
 ## Phase 6 — Iterate with the user (live updates)
 
@@ -150,7 +179,7 @@ Serving the board is not the end — it's the start of a conversation. The app p
 - *"change the look"* / *"make it feel more academic"* → update `theme` and/or `layout`.
 - *"new topic: W"* → run the full pipeline again; boards accumulate and the picker updates live.
 
-Rules for iteration: **edit surgically** — never regenerate the whole board for a local change; keep everything grounded (research before adding claims); **re-run the validator after every edit**; never restart the server (it re-reads boards from disk on every request). The user's browser updates itself — tell them nothing more than "done, it's on your board".
+Rules for iteration: **edit surgically** — never regenerate the whole board for a local change; keep everything grounded (research before adding claims, and save that research to the trail like any other); **re-run the validator after every edit**; **re-export the standalone HTML** so `.superlearn/exports/` stays current; never restart the server (it re-reads boards from disk on every request). The user's browser updates itself — tell them nothing more than "done, it's on your board".
 
 ## Quality bar
 

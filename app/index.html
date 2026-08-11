@@ -303,6 +303,47 @@
   .sources li { font-size: 13px; }
   .sources .host { color: var(--ink-400); font-size: 11.5px; margin-left: 8px; }
 
+  /* ── Research trail overlay ─────────────────────────── */
+  .research-overlay {
+    position: fixed; inset: 0; z-index: 80;
+    background: color-mix(in srgb, var(--ink-950) 72%, transparent);
+    backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 4vh 4vw;
+  }
+  .research-overlay[hidden] { display: none; }
+  .research-panel {
+    display: flex; width: min(1200px, 100%); height: 100%;
+    background: var(--ink-900); border: 1px solid var(--ink-700);
+    border-radius: 16px; overflow: hidden;
+  }
+  .research-side { width: 300px; flex: none; border-right: 1px solid var(--ink-800); display: flex; flex-direction: column; }
+  .research-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 16px; font-weight: 700; color: var(--ink-100);
+    border-bottom: 1px solid var(--ink-800); font-size: 14px; font-family: var(--font-display);
+  }
+  .research-list { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 2px; }
+  .research-list .grp { margin: 10px 6px 4px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-400); }
+  .research-list button {
+    text-align: left; background: none; border: 0; border-radius: 8px;
+    padding: 7px 10px; color: var(--ink-300); font-size: 12.5px; font-family: var(--font-mono);
+    word-break: break-all;
+  }
+  .research-list button:hover { background: var(--ink-850); color: var(--ink-100); }
+  .research-list button.active { background: var(--accent-dim); color: var(--accent-soft); }
+  .research-list .none { color: var(--ink-400); font-size: 12.5px; padding: 10px; line-height: 1.5; }
+  .research-content { flex: 1; overflow-y: auto; padding: 24px 30px; }
+  .research-content pre {
+    background: var(--ink-950); border: 1px solid var(--ink-800); border-radius: 12px;
+    padding: 14px; overflow-x: auto; font-size: 12px; line-height: 1.6; color: var(--ink-300);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  @media (max-width: 760px) { .research-panel { flex-direction: column; } .research-side { width: 100%; max-height: 40%; border-right: 0; border-bottom: 1px solid var(--ink-800); } }
+
+  /* Embedded (standalone HTML export) mode — no server behind the page. */
+  .embedded #boardPicker, .embedded #researchBtn, .embedded #htmlBtn { display: none; }
+
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
     background: var(--ink-800); border: 1px solid var(--accent); color: var(--ink-100);
@@ -334,11 +375,30 @@
   </nav>
   <div class="spacer"></div>
   <input type="search" id="search" placeholder="Filter blocks…" aria-label="Filter blocks" />
-  <button class="btn" id="exportBtn" title="Download board JSON">Export</button>
+  <button class="btn" id="researchBtn" title="Browse the research trail behind this board">Research</button>
+  <button class="btn" id="exportBtn" title="Download board JSON">JSON</button>
+  <button class="btn" id="htmlBtn" title="Save a self-contained HTML file of this board">HTML</button>
   <button class="btn" id="printBtn" title="Print / save as PDF">Print</button>
 </header>
 
 <div id="app"></div>
+
+<div id="researchOverlay" class="research-overlay" hidden>
+  <div class="research-panel">
+    <div class="research-side">
+      <div class="research-head">
+        <span>Research trail</span>
+        <button id="researchClose" class="btn" aria-label="Close">✕</button>
+      </div>
+      <div id="researchList" class="research-list"></div>
+    </div>
+    <div id="researchContent" class="research-content">
+      <p class="res-desc">The raw material this board was built from — the plan,
+      every synthesized note, and the scraper output. Pick a file.</p>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -360,6 +420,10 @@ const THEMES = {
   arctic:    { dark: false },
 };
 const HEX = /^#[0-9a-fA-F]{6}$/;
+const MODES = new Set(["study", "interview", "research", "documentation"]);
+
+/** Set by export_html.py in standalone files — renders without a server. */
+const EMBEDDED = window.SUPERLEARN_EMBEDDED_BOARD ?? null;
 
 const state = {
   boards: [],        // summaries
@@ -804,6 +868,7 @@ function render() {
   hero.append(h1);
   const meta = el("div", { class: "meta" });
   meta.append(el("span", { class: "chip accent" }, [board.topic ?? ""]));
+  meta.append(el("span", { class: "chip" }, [MODES.has(board.mode) ? board.mode : "study"]));
   if (board.depth) meta.append(el("span", { class: "chip" }, [board.depth]));
   meta.append(el("span", { class: "chip" }, [`${visibleBlocks().length || board.blocks.length} blocks`]));
   if (board.createdAt) meta.append(el("span", {}, [new Date(board.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })]));
@@ -980,13 +1045,98 @@ $("#exportBtn").addEventListener("click", () => {
   toast("Board exported");
 });
 
+$("#htmlBtn").addEventListener("click", () => {
+  if (!state.board) return toast("No board selected");
+  const a = document.createElement("a");
+  a.href = `/api/boards/${encodeURIComponent(state.board.id)}/html`;
+  a.download = `${state.board.id}.html`;
+  a.click();
+  toast("Standalone HTML saved — works anywhere, no server needed");
+});
+
 $("#printBtn").addEventListener("click", () => window.print());
 
 window.addEventListener("hashchange", () => {
+  if (EMBEDDED) return;
   const { id, view } = initFromHash();
   if (id && id !== state.board?.id) selectBoard(id, view);
   else if (view && view !== state.view && state.board) { state.view = view; render(); }
 });
+
+/* ── Research trail browser ────────────────────────────────────────── */
+
+const researchOverlay = $("#researchOverlay");
+
+$("#researchBtn").addEventListener("click", openResearch);
+$("#researchClose").addEventListener("click", () => (researchOverlay.hidden = true));
+researchOverlay.addEventListener("click", (e) => {
+  if (e.target === researchOverlay) researchOverlay.hidden = true;
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") researchOverlay.hidden = true;
+});
+
+async function openResearch() {
+  const list = $("#researchList");
+  list.innerHTML = "";
+  researchOverlay.hidden = false;
+  let files = [];
+  try {
+    const res = await fetch("/api/research");
+    files = (await res.json()).files ?? [];
+  } catch {
+    // fall through to empty state
+  }
+  if (files.length === 0) {
+    list.append(el("div", { class: "none" }, [
+      "No research files found. The trail lives in .superlearn/research/ and fills up as boards are built.",
+    ]));
+    return;
+  }
+
+  const groups = { "": [], notes: [], raw: [] };
+  for (const f of files) {
+    const top = f.path.includes("/") ? f.path.split("/")[0] : "";
+    (groups[top] ?? (groups[top] = [])).push(f);
+  }
+  const order = [["", "Plan"], ["notes", "Synthesized notes"], ["raw", "Scraper output"]];
+  const rendered = new Set(order.map(([k]) => k));
+  for (const key of Object.keys(groups)) if (!rendered.has(key)) order.push([key, key]);
+
+  for (const [key, label] of order) {
+    const bucket = groups[key] ?? [];
+    if (bucket.length === 0) continue;
+    list.append(el("div", { class: "grp" }, [label]));
+    for (const f of bucket) {
+      const btn = el("button", {}, [`${f.path}  ·  ${(f.size / 1024).toFixed(1)}kb`]);
+      btn.addEventListener("click", () => showResearchFile(f.path, btn));
+      list.append(btn);
+    }
+  }
+}
+
+async function showResearchFile(path, btn) {
+  for (const b of $("#researchList").querySelectorAll("button")) b.classList.remove("active");
+  btn.classList.add("active");
+  const content = $("#researchContent");
+  content.innerHTML = "";
+  try {
+    const res = await fetch(`/api/research/file?path=${encodeURIComponent(path)}`);
+    if (!res.ok) throw new Error();
+    const text = await res.text();
+    if (path.endsWith(".md")) {
+      content.append(el("div", { class: "md", html: md2html(text) }));
+    } else if (path.endsWith(".json")) {
+      let pretty = text;
+      try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { /* keep raw */ }
+      content.append(el("pre", {}, [pretty]));
+    } else {
+      content.append(el("pre", {}, [text]));
+    }
+  } catch {
+    content.append(el("p", { class: "res-desc" }, ["Couldn't load that file."]));
+  }
+}
 
 /* ── Live updates from the Claude Code session ─────────────────────── */
 
@@ -1029,6 +1179,21 @@ async function pollForUpdates() {
 /* ── Boot ──────────────────────────────────────────────────────────── */
 
 (async function boot() {
+  if (EMBEDDED) {
+    // Standalone HTML export: one baked-in board, no server, no polling.
+    document.body.classList.add("embedded");
+    state.boards = [{
+      id: EMBEDDED.id, title: EMBEDDED.title, emoji: EMBEDDED.emoji,
+      topic: EMBEDDED.topic, blockCount: (EMBEDDED.blocks ?? []).length,
+    }];
+    state.board = EMBEDDED;
+    state.boardRaw = JSON.stringify(EMBEDDED);
+    state.view = EMBEDDED.layout ?? "board";
+    applyTheme(EMBEDDED.theme);
+    render();
+    return;
+  }
+
   await fetchBoards();
   const { id, view } = initFromHash();
   const target = (id && state.boards.find((b) => b.id === id)) ? id : state.boards[0]?.id;

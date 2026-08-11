@@ -63,7 +63,27 @@ Plus: click-to-play video lectures, Mermaid diagrams and mindmaps, code blocks w
 
 **Live iteration**: the app polls the server and hot-reloads the open board the moment Claude edits it — keep asking questions in the running Claude Code session ("go deeper on X", "add the original papers", "make it feel more academic") and watch the page update in place.
 
-Boards are portable JSON files in `.superlearn/boards/` — share them with anyone who has the plugin.
+**Nothing is thrown away.** Every run leaves a complete paper trail on disk:
+
+```
+.superlearn/
+├── research/    the full research trail — plan, synthesized notes, raw scraper
+│                output. Browsable in the app via the Research button.
+├── boards/      portable board JSON — share with anyone who has the plugin
+└── exports/     standalone single-file HTML — the whole app + board baked into
+                 one file that opens anywhere, offline, no server needed
+```
+
+## Modes
+
+`study` is the default; pass another mode in plain words ("for my interview", "survey the literature", "as a reference") or with `--mode`:
+
+| Mode | What changes |
+|---|---|
+| `study` | Balanced conceptual mastery — the default experience |
+| `interview` | Likely questions with strong answers, pitfalls interviewers probe, rapid-recall material, fast-scan layout |
+| `research` | Literature map: seminal + recent papers with why-each-matters, state of the field, open problems, reading order |
+| `documentation` | A working reference: code-first usage patterns, configuration tables, gotchas, exact terminology |
 
 ## Install
 
@@ -111,13 +131,13 @@ python3 scripts/serve.py --boards-dir .superlearn/boards --port 4321
 commands/          /superlearn slash command
 skills/superlearn/ the research→author→serve playbook Claude follows
 agents/            parallel subtopic researcher
-scripts/           scrape_web.py · scrape_youtube.py · validate_board.py · serve.py
+scripts/           scrape_web.py · scrape_youtube.py · validate_board.py · export_html.py · serve.py
 app/               the Superlearn web app (single file, zero build step)
 ```
 
 ## Board format
 
-Boards are plain JSON — a `title`, `emoji`, `topic`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks: `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `code`, `video`, `resource`, `flashcards`, `glossary`. The full schema lives in [skills/superlearn/SKILL.md](skills/superlearn/SKILL.md), and `scripts/validate_board.py` checks any board against it.
+Boards are plain JSON — a `title`, `emoji`, `topic`, `mode`, `theme` (preset + optional accent), `layout`, `sources`, and an array of typed blocks: `summary`, `roadmap`, `concept`, `note`, `diagram` (Mermaid), `code`, `video`, `resource`, `flashcards`, `glossary`. The full schema lives in [skills/superlearn/SKILL.md](skills/superlearn/SKILL.md), `scripts/validate_board.py` checks any board against it, and `scripts/export_html.py` bakes any board into a standalone HTML file.
 
 ## License
 

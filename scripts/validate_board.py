@@ -22,6 +22,7 @@ HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 LAYOUTS = {"board", "notes", "grid", "mindmap", "feed"}
 DEPTHS = {"overview", "standard", "deep"}
 THEMES = {"midnight", "blueprint", "terminal", "paper", "sepia", "arctic"}
+MODES = {"study", "interview", "research", "documentation"}
 
 errors: list[str] = []
 warnings: list[str] = []
@@ -157,6 +158,9 @@ def main() -> int:
         warn(f"board: 'layout' should be one of {sorted(LAYOUTS)}")
     if board.get("depth") not in DEPTHS:
         warn(f"board: 'depth' should be one of {sorted(DEPTHS)}")
+    mode = board.get("mode")
+    if mode is not None and mode not in MODES:
+        err(f"board: 'mode' must be one of {sorted(MODES)} (default: study)")
 
     theme = board.get("theme")
     if theme is None:
