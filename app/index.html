@@ -166,14 +166,14 @@
   .spacer { flex: 1; }
 
   /* ── Hero ───────────────────────────────────────────── */
-  .hero { padding: 34px 26px 8px; max-width: 1500px; margin: 0 auto; }
+  .hero { padding: 30px 24px 8px; max-width: 1920px; margin: 0 auto; }
   .hero h1 { font-size: clamp(26px, 4vw, 42px); color: var(--ink-100); letter-spacing: -.02em; line-height: 1.1; font-family: var(--font-display); }
   .hero h1 .emoji { margin-right: 12px; }
   .hero .meta { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; color: var(--ink-400); font-size: 13px; }
   .chip { border: 1px solid var(--ink-700); background: var(--ink-850); border-radius: 99px; padding: 3px 11px; font-size: 12px; }
   .chip.accent { color: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 
-  main { max-width: 1500px; margin: 0 auto; padding: 22px 26px 80px; }
+  main { max-width: 1920px; margin: 0 auto; padding: 22px 24px 80px; }
 
   /* ── Layouts ────────────────────────────────────────── */
   .masonry { column-gap: 20px; column-count: 1; }
@@ -455,6 +455,24 @@
     overflow: hidden; border: 1px solid var(--ink-800); border-radius: 18px;
     background: var(--ink-950); cursor: grab; touch-action: none;
   }
+  /* In canvas view the wall owns the whole page below the header — no hero,
+     no gutters, no competing page scroll. */
+  main.canvas-main { max-width: none; padding: 0; }
+  .canvas-main .canvas-viewport {
+    height: calc(100vh - 59px); min-height: 480px;
+    border: 0; border-top: 1px solid var(--ink-800); border-radius: 0;
+  }
+  .canvas-chip {
+    position: absolute; top: 14px; left: 16px; z-index: 3;
+    display: flex; align-items: center; gap: 10px; max-width: 46vw;
+    background: color-mix(in srgb, var(--ink-900) 88%, transparent);
+    border: 1px solid var(--ink-800); border-radius: 11px; padding: 8px 14px;
+  }
+  .canvas-chip .cemoji { font-size: 18px; }
+  .canvas-chip .ctitle { font-family: var(--font-display); font-weight: 700; font-size: 14px;
+                         color: var(--ink-100); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .canvas-chip .progress-track { flex: 0 0 90px; }
+  .canvas-chip .progress-label { white-space: nowrap; font-size: 11.5px; }
   .canvas-viewport.dragging { cursor: grabbing; }
   .canvas-surface {
     position: absolute; transform-origin: 0 0;
@@ -500,6 +518,11 @@
   .canvas-hint { position: absolute; top: 14px; right: 16px; z-index: 3; font-size: 11.5px; color: var(--ink-400);
                  background: color-mix(in srgb, var(--ink-900) 80%, transparent); border: 1px solid var(--ink-800);
                  border-radius: 9px; padding: 5px 11px; pointer-events: none; }
+  @media (max-width: 900px) {
+    .canvas-hint { display: none; }
+    .canvas-chip { max-width: 74vw; }
+    .canvas-chip .progress-label { display: none; }
+  }
 
   /* ── Read progress ──────────────────────────────────── */
   .read-toggle {
@@ -542,7 +565,11 @@
     position: fixed; left: 18px; top: 150px; bottom: 24px; width: 232px; z-index: 5;
     overflow-y: auto; padding-right: 6px; display: none;
   }
-  @media (min-width: 1580px) { .toc-rail { display: block; } }
+  @media (min-width: 1580px) {
+    .toc-rail { display: block; }
+    /* The rail is fixed at the left edge — shift the page content past it. */
+    #app.has-toc .hero, #app.has-toc main { padding-left: 278px; }
+  }
   .toc-rail h4 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .14em;
                  color: var(--ink-500); margin: 0 0 10px 10px; }
   .toc-rail a {
@@ -2601,8 +2628,9 @@ function buildCanvas(blocks) {
     const vw = viewport.clientWidth, vh = viewport.clientHeight;
     v.scale = Math.min(0.65, (vw - 60) / v.w);
     v.x = (vw - v.w * v.scale) / 2;
-    // Shorter than the viewport → center it; taller → start at the top.
-    v.y = Math.max(30, (vh - v.h * v.scale) / 2);
+    // Shorter than the viewport → center it; taller → start just below the
+    // board chip so the first row's labels aren't hidden behind it.
+    v.y = Math.max(76, (vh - v.h * v.scale) / 2);
     apply();
   };
   const overview = () => {
@@ -2706,7 +2734,13 @@ function buildCanvas(blocks) {
     label.addEventListener("pointerup", drop);
     label.addEventListener("pointercancel", drop);
   }
-  viewport.append(bar, el("div", { class: "canvas-hint" }, ["drag to pan · scroll to zoom"]));
+  const chip = el("div", { class: "canvas-chip" }, [
+    el("span", { class: "cemoji" }, [state.board?.emoji ?? "🧠"]),
+    el("span", { class: "ctitle" }, [state.board?.title ?? ""]),
+    el("div", { class: "progress-track" }, [el("div", { class: "progress-fill", "data-readfill": "" })]),
+    el("span", { class: "progress-label", "data-readlabel": "" }),
+  ]);
+  viewport.append(bar, chip, el("div", { class: "canvas-hint" }, ["drag to pan · scroll to zoom · drag a label to rearrange"]));
 
   // ── layout: place frames in rows once their heights are measurable ──
   // Wide rows keep the wall close to screen aspect, so "Fit" is readable.
@@ -2963,8 +2997,9 @@ function render() {
 
   if (!state.board) { renderEmpty(); return; }
   const board = state.board;
+  const isCanvas = state.view === "canvas";
 
-  // Hero
+  // Hero — skipped on the canvas, which owns the whole page below the header.
   const hero = el("div", { class: "hero" });
   const h1 = el("h1");
   h1.append(el("span", { class: "emoji" }, [board.emoji ?? "🧠"]), board.title ?? board.topic);
@@ -2984,9 +3019,9 @@ function render() {
     el("span", { class: "progress-label", "data-readlabel": "" }),
   );
   hero.append(prow);
-  app.append(hero);
+  if (!isCanvas) app.append(hero);
 
-  const main = el("main");
+  const main = el("main", { class: isCanvas ? "canvas-main" : "" });
   const blocks = visibleBlocks();
 
   if (state.view === "mindmap") {
@@ -3026,7 +3061,7 @@ function render() {
   }
 
   // Sources
-  if ((board.sources ?? []).length > 0 && !state.query) {
+  if ((board.sources ?? []).length > 0 && !state.query && !isCanvas) {
     const src = el("section", { class: "sources" });
     src.append(el("h3", {}, ["Research sources"]));
     const ul = el("ul");
@@ -3046,8 +3081,10 @@ function render() {
   }
 
   app.append(main);
+  app.classList.remove("has-toc");
   if (["notes", "feed"].includes(state.view) && blocks.length > 4) {
     app.append(buildToc(main, blocks));
+    app.classList.add("has-toc");
   }
   typesetMath(app);
   highlightCode(app);
