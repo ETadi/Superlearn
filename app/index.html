@@ -964,16 +964,47 @@ function el(tag, attrs = {}, children = []) {
 
 /* ── Theme application ─────────────────────────────────────────────── */
 
+const LIGHT_PRESETS = new Set(["paper", "sepia", "arctic"]);
+
+function appearanceStoreKey() { return `superlearn.appearance.${state.board?.id ?? "global"}`; }
+
+/* The viewer can force a white or black base. Painting only the body would
+   strand light text on a white page, so the mode moves the whole ink scale:
+   White keeps a light preset (or adopts arctic) and pushes its base to pure
+   white; Black keeps a dark preset (or adopts midnight) and pushes to pure
+   black. Every derived color — code tokens, chart series — follows the
+   preset, so nothing goes unreadable. */
 function applyTheme(theme) {
-  const preset = THEMES[theme?.preset] ? theme.preset : "midnight";
-  document.documentElement.dataset.theme = preset;
+  let preset = THEMES[theme?.preset] ? theme.preset : "midnight";
+  const mode = localStorage.getItem(appearanceStoreKey()) ?? "auto";
   const root = document.documentElement.style;
+  root.removeProperty("--ink-950");
+  root.removeProperty("--ink-900");
+  if (mode === "white" && !LIGHT_PRESETS.has(preset)) preset = "arctic";
+  if (mode === "black" && LIGHT_PRESETS.has(preset)) preset = "midnight";
+  document.documentElement.dataset.theme = preset;
+  if (mode === "white") {
+    root.setProperty("--ink-950", "#ffffff");
+    root.setProperty("--ink-900", "#f7f9fc");
+  } else if (mode === "black") {
+    root.setProperty("--ink-950", "#000000");
+    root.setProperty("--ink-900", "#08080b");
+  }
   if (theme?.accent && HEX.test(theme.accent)) {
     root.setProperty("--accent", theme.accent);
   } else {
     root.removeProperty("--accent"); // fall back to the preset's accent
   }
   loadWallpaper();
+  for (const b of document.querySelectorAll(".ap-swatch")) {
+    b.classList.toggle("on", b.dataset.ap === mode);
+  }
+}
+
+function setAppearance(mode) {
+  localStorage.setItem(appearanceStoreKey(), mode);
+  applyTheme(state.board?.theme);
+  render();   // diagrams re-render in the new palette
 }
 
 function currentThemeIsDark() {
@@ -1225,7 +1256,7 @@ function cssVar(name) {
 }
 
 function configureMermaid(m) {
-  const key = document.documentElement.dataset.theme + "|" + cssVar("--accent");
+  const key = document.documentElement.dataset.theme + "|" + cssVar("--accent") + "|" + cssVar("--ink-950");
   if (key === mermaidThemeKey) return;
   mermaidThemeKey = key;
   const dark = currentThemeIsDark();
@@ -3002,6 +3033,30 @@ function wireWallpaper() {
     grid.append(sw);
   }
   pop.append(grid);
+
+  pop.append(el("h5", { style: "margin-top:12px" }, ["Base"]));
+  const baseGrid = el("div", { class: "wp-grid" });
+  for (const [mode, label, bg, fg] of [
+    ["auto", "Theme", "", ""],
+    ["white", "White", "#ffffff", "#1a2230"],
+    ["black", "Black", "#000000", "#d5d9e2"],
+  ]) {
+    const sw = el("button", { class: "wp-swatch ap-swatch", "data-ap": mode, title: label });
+    if (mode === "auto") sw.append(el("span", { class: "wmark" }, ["✦"]));
+    else {
+      sw.style.backgroundColor = bg;
+      const lab = el("span", { class: "wlabel" }, [label]);
+      lab.style.background = "transparent";
+      lab.style.color = fg;
+      sw.append(lab);
+      sw.dataset.plain = "1";
+    }
+    if (mode === "auto") sw.append(el("span", { class: "wlabel" }, [label]));
+    sw.addEventListener("click", () => setAppearance(mode));
+    baseGrid.append(sw);
+  }
+  pop.append(baseGrid);
+
   btn.addEventListener("click", () => (pop.hidden = !pop.hidden));
   document.addEventListener("pointerdown", (e) => {
     if (!pop.hidden && !e.target.closest(".wp-pop, .wp-btn")) pop.hidden = true;
