@@ -434,9 +434,8 @@
   }
   /* SVGs get explicit pixel dimensions from their viewBox in openZoom(); this
      only bounds raster images, which already have an intrinsic size. */
-  .zoom-inner img { max-width: 82vw; max-height: 76vh; height: auto; width: auto; }
+  .zoom-inner img { max-width: 82vw; max-height: 76vh; height: auto; width: auto; border-radius: 6px; }
   .zoom-inner svg { display: block; }
-  .zoom-inner img { border-radius: 6px; }
   .zoom-bar {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 6px; align-items: center;
@@ -720,7 +719,7 @@
 
   /* Embedded (standalone HTML export) mode — no server behind the page. */
   .embedded #boardPicker, .embedded #researchBtn, .embedded #htmlBtn, .embedded #reviewBtn { display: none; }
-  .embedded .ann-editctl, .embedded .ann-add, .embedded .related { display: none; }
+  .embedded .ann-editctl, .embedded .ann-add, .embedded .related, .embedded .hl-count button { display: none; }
 
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
@@ -1757,8 +1756,9 @@ function renderBlock(block, index) {
 /* ── Cross-board links ─────────────────────────────────────────────── */
 
 function renderRelated(block) {
-  const wrap = el("div");
-  if (!Array.isArray(block.related) || block.related.length === 0) return wrap;
+  if (!Array.isArray(block.related) || block.related.length === 0) {
+    return document.createDocumentFragment();
+  }
   const row = el("div", { class: "related no-print" });
   for (const r of block.related) {
     if (!r || typeof r.board !== "string") continue;
@@ -1768,8 +1768,7 @@ function renderRelated(block) {
     btn.addEventListener("click", () => navigateRelated(r));
     row.append(btn);
   }
-  if (row.childNodes.length) wrap.append(row);
-  return wrap;
+  return row.childNodes.length ? row : document.createDocumentFragment();
 }
 
 async function navigateRelated(r) {
@@ -2362,7 +2361,7 @@ function renderCode(block) {
   wrap.append(el("span", { class: "lang" }, [lang || "code"]));
 
   const bar = el("div", { class: "codebar no-print" });
-  const copy = el("button", { class: "copy" }, ["Copy"]);
+  const copy = el("button", {}, ["Copy"]);
   copy.addEventListener("click", () => {
     navigator.clipboard?.writeText(block.code ?? "").then(() => {
       copy.textContent = "Copied ✓";
