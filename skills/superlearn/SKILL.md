@@ -51,16 +51,34 @@ This is the heart of Superlearn. For **each unchecked subtopic**:
 
 1. Scrape it: `scrape_web.py "<topic> <subtopic>" --read 2 --out .superlearn/research/raw/<slug>-<n>.json`
 2. Supplement with your own WebSearch/WebFetch where the scrape is thin, plus your expert knowledge.
-3. Write `.superlearn/research/notes/<nn>-<subtopic-slug>.md`: the key ideas, concrete examples, pitfalls, one candidate diagram idea, candidate quiz questions, and the URLs that back it.
+3. Write `.superlearn/research/notes/<nn>-<subtopic-slug>.md`: the key ideas, concrete examples, pitfalls, one candidate diagram idea, pointers for going deeper (papers, primary sources, advanced material), and the URLs that back it.
 4. Tick the checkbox in `plan.md`.
 
 Repeat until **every** box is ticked. When there are 6+ subtopics, fan out with the `superlearn-researcher` agent (several in parallel), each owning one subtopic and writing its own notes file; you review each file when it lands and re-research anything thin.
 
 Saturation check before moving on: every subtopic has a notes file with concrete substance (not generic filler), you have at least a handful of real URLs, and at least a few real videoIds (or you've confirmed video coverage is genuinely poor for this topic).
 
-## Phase 4 — Author the board
+## Phase 4 — Design and author the board
 
-Write `.superlearn/boards/<slug>.json`. This is a **teaching artifact, not a summary dump** — every block should teach. Ground claims in your notes; use real URLs and videoIds only.
+Write `.superlearn/boards/<slug>.json`. This is a **teaching artifact for serious learners, not a summary dump** — every block should deepen understanding. Ground claims in your notes; use real URLs and videoIds only. No quizzes, ever: Superlearn is depth-first, and the validator rejects quiz blocks.
+
+### Design the experience first
+
+**You decide the page's structure and visual identity — deliberately, per topic.** Never default to the same layout/theme out of habit. Choose:
+
+- `layout` — the default view: `board` (masonry cards), `notes` (single-column document), `grid` (uniform cards), `mindmap` (map-first), `feed` (full-width sequence).
+- `theme` — `{"preset": "<name>", "accent": "#rrggbb"?}`. Presets are complete visual identities (background, ink scale, typography):
+
+| Preset | Feel | Suits |
+|---|---|---|
+| `midnight` | dark violet, modern sans | general, creative, product/design topics |
+| `blueprint` | deep navy grid, cyan lines | engineering, systems, architecture, hardware |
+| `terminal` | near-black, monospace, green | programming, CLIs, infra, security |
+| `paper` | warm white, serif, academic | math, theory, research-paper-heavy topics |
+| `sepia` | warm tan, bookish serif | history, philosophy, literature, humanities |
+| `arctic` | cool light, clean sans | science, medicine, data, finance |
+
+Match structure to the material: a history topic reads best as `notes`/`feed` in `sepia`; a systems-design topic as `board`/`grid` in `blueprint` with diagrams everywhere; a paper-driven field as `notes` in `paper` with a strong resource spine. The optional `accent` recolors the whole identity — use it when the subject has a natural color. **Record the choice and a one-line justification in `plan.md`.**
 
 ### Board schema
 
@@ -72,13 +90,12 @@ Write `.superlearn/boards/<slug>.json`. This is a **teaching artifact, not a sum
   "emoji": "<one emoji>",
   "createdAt": "<ISO 8601>",
   "depth": "standard",
-  "layout": "board",
+  "layout": "<your deliberate choice>",
+  "theme": { "preset": "<your deliberate choice>", "accent": "#8a2d3b" },
   "blocks": [ ... ],
   "sources": [{ "title": "...", "url": "...", "snippet": "..." }]
 }
 ```
-
-`layout` is the default view: `board` (Pinterest masonry), `notes`, `grid`, `mindmap`, or `feed`.
 
 ### Block types
 
@@ -92,13 +109,12 @@ Every block: `"type"`, `"title"`, plus type-specific fields. Markdown fields sup
 | `note` | `markdown` | Practical tips, gotchas, mental models. |
 | `diagram` | `mermaid`, `caption` | Valid Mermaid. Prefer `flowchart TD` or `mindmap`. Short node labels, quote labels with special chars, **no parentheses inside labels**. Include at least one `mindmap` diagram mapping the whole topic. |
 | `code` | `language`, `code`, `explanation` | Runnable, idiomatic examples. Only for technical topics. |
-| `video` | `videoId`, `channel`, `reason` | **Only videoIds from the scraper output.** Never invent IDs. `reason` = why this video earns its slot. |
-| `resource` | `url`, `source`, `description` | **Only URLs from your research.** The best reading, not everything. |
-| `quiz` | `questions: [{question, options[4], answerIndex, explanation}]` | 5–10 questions spanning easy → hard. |
-| `flashcards` | `cards: [{front, back}]` | 8–16 cards on the recall-worthy facts. |
+| `video` | `videoId`, `channel`, `reason` | **Only videoIds from the scraper output.** Never invent IDs. `reason` = why this video earns its slot. Prefer lectures and deep talks over pop explainers. |
+| `resource` | `url`, `source`, `description` | **Only URLs from your research.** Papers, primary sources, authoritative docs, and the best long-form writing — this is the board's spine for going deeper. |
+| `flashcards` | `cards: [{front, back}]` | Optional. Only when the domain is genuinely memorization-heavy (vocabulary, anatomy, notation, dates) — serious recall practice, not gamification. |
 | `glossary` | `entries: [{term, definition}]` | The vocabulary of the field. |
 
-A standard board is 12–18 blocks: 1 summary, 1 roadmap, 4–8 concepts, 1–3 diagrams (≥1 mindmap), 1–2 notes, code if technical, 2–4 videos, 2–4 resources, 1 quiz, 1 flashcards, 1 glossary. Scale up for "deep dive" requests, down for "quick overview".
+A standard board is 12–18 blocks: 1 summary, 1 roadmap, 4–8 concepts, 1–3 diagrams (≥1 mindmap), 1–3 notes, code if technical, 2–4 videos, **4–8 resources** (papers, docs, long-form articles), 1 glossary, flashcards only where recall genuinely matters. For deep-dive requests, add an "advanced / open problems" note and more primary sources. Scale down for "quick overview".
 
 ### Validate — never serve an unvalidated board
 
@@ -118,15 +134,28 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/serve.py" --boards-dir .superlearn/boards
 
 Run it in the background so the session stays free. Confirm it's up (`curl -s http://localhost:4321/api/boards`), then tell the user:
 
-- Open **http://localhost:4321** — their board is live.
+- Open **http://localhost:4321** — their board is live, in the layout and theme you designed for the topic.
 - The view switcher (Board / Notes / Grid / Mindmap / Feed) restyles the whole experience.
-- Quizzes are interactive with scoring, flashcards flip and track what they know, videos play inline.
-- They can ask you to **extend the board** ("add a section on X", "make the quiz harder", "go deeper") — edit the JSON and the app picks it up on refresh.
+- Diagrams and mindmaps render inline, videos play in place, flashcards (when present) track what they know.
+- **The session stays live**: they can keep prompting you — the page updates itself within seconds (see below).
 - Boards live in `.superlearn/boards/` as portable JSON they can share; anyone with the plugin can drop a board file in and serve it.
+
+## Phase 6 — Iterate with the user (live updates)
+
+Serving the board is not the end — it's the start of a conversation. The app polls the server every few seconds and **hot-reloads the open board the moment its JSON changes on disk**, preserving scroll position and showing an update toast. So when the user says things like:
+
+- *"go deeper on X"* / *"add the original papers"* → research if needed, then **append or expand blocks** in the board JSON.
+- *"this section is too shallow"* / *"explain Y properly"* → rewrite that block's markdown with real depth.
+- *"add a diagram of Z"* / *"map how these relate"* → add a `diagram` block.
+- *"change the look"* / *"make it feel more academic"* → update `theme` and/or `layout`.
+- *"new topic: W"* → run the full pipeline again; boards accumulate and the picker updates live.
+
+Rules for iteration: **edit surgically** — never regenerate the whole board for a local change; keep everything grounded (research before adding claims); **re-run the validator after every edit**; never restart the server (it re-reads boards from disk on every request). The user's browser updates itself — tell them nothing more than "done, it's on your board".
 
 ## Quality bar
 
 - **Grounded**: claims trace to research notes; no invented URLs or videoIds — the validator and the app both enforce this, but you enforce it first.
+- **Deep, not gamified**: this is a tool for people who want mastery. No quizzes, no filler engagement mechanics. Advanced sections, primary sources, open problems, and honest complexity belong on the board.
 - **Taught, not listed**: prefer "here's the idea, here's an example, here's the pitfall" over bullet dumps.
 - **Visual**: at least one mindmap of the whole territory; diagrams wherever structure beats prose.
-- **Assessable**: the quiz should genuinely test understanding built by the concepts, not trivia.
+- **Designed**: layout and theme chosen for the subject, with the reasoning noted in plan.md — never the same default twice in a row out of habit.

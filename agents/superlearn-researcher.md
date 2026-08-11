@@ -19,7 +19,7 @@ Method:
    - **Key ideas** — the 3–6 things a learner must understand, each explained in 2–4 sentences with a concrete example.
    - **Pitfalls & misconceptions** — what beginners get wrong.
    - **Diagram idea** — one structure worth drawing (describe nodes/edges so the author can write Mermaid).
-   - **Quiz candidates** — 2–3 question ideas with correct answers.
+   - **Going deeper** — the papers, primary sources, or advanced material a serious learner should reach next.
    - **Sources** — the real URLs that back the notes.
 
 Rules: never invent URLs; keep notes dense and specific (no generic filler); if the subtopic turns out to overlap another or be empty, say so plainly at the top of the notes file. Your final message should be one short paragraph: what you covered and anything the board author should watch out for.

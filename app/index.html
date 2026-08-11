@@ -1,48 +1,131 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="midnight">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Superlearn</title>
 <style>
+  /* ══════════════════════════════════════════════════════════════════
+     Theme system. Each board declares {"theme":{"preset":..,"accent":..}}
+     and Claude Code picks the identity that fits the subject. The ink-*
+     scale is semantic (950 = deepest background → 100 = strongest text),
+     so light themes simply invert it. Accent derivatives are computed
+     with color-mix, so a custom accent recolors the whole page.
+     ══════════════════════════════════════════════════════════════════ */
   :root {
+    --accent: #7c5cff;
+    --accent-soft: color-mix(in srgb, var(--accent) 62%, var(--ink-100));
+    --accent-glow: color-mix(in srgb, var(--accent) 72%, var(--ink-950));
+    --accent-dim: color-mix(in srgb, var(--accent) 16%, transparent);
+    --accent-sel: color-mix(in srgb, var(--accent) 40%, transparent);
+    --coral: #ff6b6b; --mint: #3ddc97; --gold: #ffc857; --sky: #4cc9f0;
+    --radius: 16px;
+    --font-body: "Avenir Next", Avenir, "Segoe UI", Inter, system-ui, sans-serif;
+    --font-display: var(--font-body);
+    --font-mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+    --shadow-card: 0 14px 44px -14px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  [data-theme="midnight"] {
+    color-scheme: dark;
     --ink-950: #0b0b10; --ink-900: #12121a; --ink-850: #171724; --ink-800: #1d1d2b;
     --ink-700: #2a2a3d; --ink-600: #3d3d55; --ink-400: #8a8aa3; --ink-300: #b0b0c4;
     --ink-200: #d4d4e2; --ink-100: #ececf4;
-    --accent: #7c5cff; --accent-soft: #a08bff; --accent-glow: #5636d6;
-    --coral: #ff6b6b; --mint: #3ddc97; --gold: #ffc857; --sky: #4cc9f0;
-    --radius: 16px;
+    --accent: #7c5cff;
+    --bg-image: radial-gradient(1200px 600px at 80% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+                radial-gradient(900px 500px at -10% 30%, rgba(76,201,240,.08), transparent 55%);
   }
+
+  [data-theme="blueprint"] {
+    color-scheme: dark;
+    --ink-950: #0a1628; --ink-900: #0e1d33; --ink-850: #122440; --ink-800: #1a3050;
+    --ink-700: #27466b; --ink-600: #3a5f8a; --ink-400: #7d9cbf; --ink-300: #a5c0dd;
+    --ink-200: #cfe0f2; --ink-100: #eaf3fc;
+    --accent: #4cc9f0; --gold: #ffc857; --coral: #ff8a80; --mint: #6fe3b4;
+    --bg-image: linear-gradient(rgba(76,201,240,.045) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(76,201,240,.045) 1px, transparent 1px);
+    --bg-size: 32px 32px;
+  }
+
+  [data-theme="terminal"] {
+    color-scheme: dark;
+    --ink-950: #050806; --ink-900: #0a110c; --ink-850: #0d1710; --ink-800: #142117;
+    --ink-700: #1f3325; --ink-600: #2e4a36; --ink-400: #6f9a7c; --ink-300: #93bd9f;
+    --ink-200: #c0e4c8; --ink-100: #e4fbe8;
+    --accent: #2fbf71; --gold: #ffb454; --coral: #ff7a70; --sky: #56d4dd; --mint: #2fbf71;
+    --font-body: var(--font-mono); --font-display: var(--font-mono);
+    --bg-image: repeating-linear-gradient(0deg, transparent 0 2px, rgba(47,191,113,.02) 2px 4px);
+  }
+
+  [data-theme="paper"] {
+    color-scheme: light;
+    --ink-950: #f4f0e6; --ink-900: #faf7ef; --ink-850: #fffdf7; --ink-800: #e5ded0;
+    --ink-700: #d3c9b4; --ink-600: #b3a78c; --ink-400: #6f6754; --ink-300: #48423a;
+    --ink-200: #2f2b25; --ink-100: #1a1712;
+    --accent: #8a2d3b; --coral: #b4462f; --mint: #2e6e4e; --gold: #9a6a1f; --sky: #23617d;
+    --accent-soft: color-mix(in srgb, var(--accent) 82%, var(--ink-100));
+    --font-body: Charter, Georgia, "Times New Roman", serif;
+    --font-display: Charter, Georgia, serif;
+    --bg-image: none;
+    --shadow-card: 0 10px 30px -14px rgba(60, 40, 20, .25);
+  }
+
+  [data-theme="sepia"] {
+    color-scheme: light;
+    --ink-950: #efe3cb; --ink-900: #f6ecd8; --ink-850: #fbf3e2; --ink-800: #ddcda9;
+    --ink-700: #c8b489; --ink-600: #a68f61; --ink-400: #6d5c3d; --ink-300: #4c402c;
+    --ink-200: #352c1e; --ink-100: #201a10;
+    --accent: #9c5a1e; --coral: #a53a2a; --mint: #4f6b34; --gold: #8a6a12; --sky: #3a6273;
+    --accent-soft: color-mix(in srgb, var(--accent) 82%, var(--ink-100));
+    --font-body: Georgia, "Iowan Old Style", serif;
+    --font-display: Georgia, serif;
+    --bg-image: radial-gradient(900px 500px at 50% -10%, rgba(156,90,30,.10), transparent 60%);
+    --shadow-card: 0 10px 30px -14px rgba(90, 60, 20, .3);
+  }
+
+  [data-theme="arctic"] {
+    color-scheme: light;
+    --ink-950: #edf1f6; --ink-900: #f5f8fb; --ink-850: #ffffff; --ink-800: #dde5ee;
+    --ink-700: #c4d1e0; --ink-600: #9db0c6; --ink-400: #5d708a; --ink-300: #3d4d63;
+    --ink-200: #283548; --ink-100: #16202e;
+    --accent: #0f6bd7; --coral: #d64550; --mint: #0e8a6d; --gold: #b07816; --sky: #0d7f9c;
+    --accent-soft: color-mix(in srgb, var(--accent) 82%, var(--ink-100));
+    --font-body: "Segoe UI", Inter, system-ui, sans-serif;
+    --bg-image: radial-gradient(1000px 500px at 80% -10%, rgba(15,107,215,.08), transparent 60%);
+    --shadow-card: 0 10px 30px -16px rgba(20, 50, 90, .28);
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { color-scheme: dark; }
   body {
-    background: var(--ink-950);
-    background-image:
-      radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,.14), transparent 60%),
-      radial-gradient(900px 500px at -10% 30%, rgba(76,201,240,.08), transparent 55%);
+    background-color: var(--ink-950);
+    background-image: var(--bg-image, none);
+    background-size: var(--bg-size, auto);
     background-attachment: fixed;
     color: var(--ink-200);
-    font-family: "Avenir Next", Avenir, "Segoe UI", Inter, system-ui, sans-serif;
+    font-family: var(--font-body);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
+    transition: background-color .3s ease, color .3s ease;
   }
-  ::selection { background: rgba(124,92,255,.4); color: #fff; }
+  ::selection { background: var(--accent-sel); }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--ink-950); }
   ::-webkit-scrollbar-thumb { background: var(--ink-700); border-radius: 99px; }
   a { color: var(--accent-soft); text-decoration: none; }
   a:hover { color: var(--accent); }
   button { font: inherit; cursor: pointer; }
+  code, pre { font-family: var(--font-mono); }
 
   /* ── Chrome ─────────────────────────────────────────── */
   header {
     position: sticky; top: 0; z-index: 50;
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     padding: 14px 22px;
-    background: rgba(11,11,16,.82); backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--ink-950) 84%, transparent);
+    backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--ink-800);
   }
-  .logo { display: flex; align-items: baseline; gap: 8px; font-weight: 700; font-size: 19px; color: var(--ink-100); letter-spacing: -.02em; }
+  .logo { display: flex; align-items: baseline; gap: 8px; font-weight: 700; font-size: 19px; color: var(--ink-100); letter-spacing: -.02em; font-family: var(--font-display); }
   .logo .spark { color: var(--accent); }
   .logo small { font-size: 11px; font-weight: 500; color: var(--ink-400); letter-spacing: .12em; text-transform: uppercase; }
 
@@ -53,26 +136,24 @@
   }
   select:hover, .btn:hover { border-color: var(--ink-600); }
   input[type=search] { width: 210px; }
-  input[type=search]:focus { border-color: var(--accent-glow); }
-  .btn.primary { background: var(--accent-glow); border-color: var(--accent); color: #fff; }
-  .btn.primary:hover { background: var(--accent); }
+  input[type=search]:focus { border-color: var(--accent); }
 
   .views { display: flex; gap: 4px; background: var(--ink-850); border: 1px solid var(--ink-700); border-radius: 12px; padding: 4px; }
   .views button {
     background: none; border: 0; color: var(--ink-400);
     padding: 6px 13px; border-radius: 8px; font-size: 13px; font-weight: 600;
   }
-  .views button.active { background: var(--accent-glow); color: #fff; }
+  .views button.active { background: var(--accent); color: var(--ink-950); }
   .views button:hover:not(.active) { color: var(--ink-100); }
   .spacer { flex: 1; }
 
   /* ── Hero ───────────────────────────────────────────── */
   .hero { padding: 34px 26px 8px; max-width: 1500px; margin: 0 auto; }
-  .hero h1 { font-size: clamp(26px, 4vw, 42px); color: var(--ink-100); letter-spacing: -.02em; line-height: 1.1; }
+  .hero h1 { font-size: clamp(26px, 4vw, 42px); color: var(--ink-100); letter-spacing: -.02em; line-height: 1.1; font-family: var(--font-display); }
   .hero h1 .emoji { margin-right: 12px; }
   .hero .meta { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; color: var(--ink-400); font-size: 13px; }
   .chip { border: 1px solid var(--ink-700); background: var(--ink-850); border-radius: 99px; padding: 3px 11px; font-size: 12px; }
-  .chip.accent { color: var(--accent-soft); border-color: rgba(124,92,255,.4); }
+  .chip.accent { color: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 
   main { max-width: 1500px; margin: 0 auto; padding: 22px 26px 80px; }
 
@@ -96,7 +177,7 @@
     animation: rise .45s ease both;
   }
   @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-  .card:hover { transform: translateY(-3px); border-color: var(--ink-700); box-shadow: 0 14px 44px -14px rgba(124,92,255,.35); }
+  .card:hover { transform: translateY(-3px); border-color: var(--ink-700); box-shadow: var(--shadow-card); }
   .card::before {
     content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
     background: var(--card-accent, var(--accent));
@@ -107,7 +188,7 @@
     font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
     color: var(--card-accent, var(--accent-soft));
   }
-  .card h2 { color: var(--ink-100); font-size: 18px; letter-spacing: -.01em; margin-bottom: 10px; line-height: 1.25; }
+  .card h2 { color: var(--ink-100); font-size: 18px; letter-spacing: -.01em; margin-bottom: 10px; line-height: 1.25; font-family: var(--font-display); }
   .card .tagline { color: var(--ink-300); font-style: italic; margin: -4px 0 10px; font-size: 14px; }
 
   .notesflow .card, .feedflow .card { padding: 26px 30px; }
@@ -118,7 +199,7 @@
   .md h3, .md h4 { color: var(--ink-100); margin-top: 6px; font-size: 15px; }
   .md h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-soft); }
   .md strong { color: var(--ink-100); }
-  .md code { background: var(--ink-950); border: 1px solid var(--ink-800); border-radius: 6px; padding: 1.5px 6px; font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; font-size: .86em; color: var(--sky); }
+  .md code { background: var(--ink-950); border: 1px solid var(--ink-800); border-radius: 6px; padding: 1.5px 6px; font-size: .86em; color: var(--sky); }
   .md pre { background: var(--ink-950); border: 1px solid var(--ink-800); border-radius: 12px; padding: 14px; overflow-x: auto; }
   .md pre code { background: none; border: 0; padding: 0; color: var(--ink-200); font-size: 12.5px; line-height: 1.6; }
   .md ul, .md ol { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
@@ -132,13 +213,12 @@
   .video-shell { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 16/9; background: #000; cursor: pointer; }
   .video-shell img { width: 100%; height: 100%; object-fit: cover; opacity: .85; transition: opacity .2s, transform .3s; }
   .video-shell:hover img { opacity: 1; transform: scale(1.03); }
-  .video-shell .play {
-    position: absolute; inset: 0; display: grid; place-items: center;
-  }
+  .video-shell .play { position: absolute; inset: 0; display: grid; place-items: center; }
   .video-shell .play span {
     width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
-    background: rgba(124,92,255,.92); color: #fff; font-size: 22px; padding-left: 4px;
-    box-shadow: 0 8px 30px rgba(86,54,214,.55);
+    background: color-mix(in srgb, var(--accent) 92%, transparent); color: var(--ink-950);
+    font-size: 22px; padding-left: 4px;
+    box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 55%, transparent);
   }
   .video-shell iframe { width: 100%; height: 100%; border: 0; }
   .video-meta { margin-top: 10px; font-size: 12.5px; color: var(--ink-400); }
@@ -148,24 +228,8 @@
   .codewrap { position: relative; }
   .codewrap .lang { position: absolute; top: 10px; left: 14px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-400); }
   .codewrap .copy { position: absolute; top: 7px; right: 8px; font-size: 11px; padding: 4px 10px; border-radius: 7px; background: var(--ink-800); border: 1px solid var(--ink-700); color: var(--ink-300); }
-  .codewrap .copy:hover { color: #fff; border-color: var(--accent); }
-  .codewrap pre { background: var(--ink-950); border: 1px solid var(--ink-800); border-radius: 12px; padding: 34px 14px 14px; overflow-x: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.65; color: var(--ink-200); }
-
-  /* ── Quiz ───────────────────────────────────────────── */
-  .quiz-q { margin-bottom: 16px; }
-  .quiz-q .qtext { color: var(--ink-100); font-weight: 600; font-size: 14.5px; margin-bottom: 9px; }
-  .quiz-opt {
-    display: block; width: 100%; text-align: left;
-    background: var(--ink-900); border: 1px solid var(--ink-700); color: var(--ink-300);
-    border-radius: 10px; padding: 9px 13px; margin-bottom: 7px; font-size: 13.5px;
-    transition: border-color .15s, background .15s;
-  }
-  .quiz-opt:hover:not(:disabled) { border-color: var(--accent); }
-  .quiz-opt:disabled { cursor: default; opacity: .75; }
-  .quiz-opt.correct { border-color: var(--mint); background: rgba(61,220,151,.12); color: var(--mint); opacity: 1; }
-  .quiz-opt.wrong { border-color: var(--coral); background: rgba(255,107,107,.10); color: var(--coral); }
-  .quiz-expl { font-size: 12.5px; color: var(--ink-400); padding: 8px 12px; border-left: 2px solid var(--mint); margin: 4px 0 6px; }
-  .quiz-score { margin-top: 8px; font-weight: 700; color: var(--gold); font-size: 14px; }
+  .codewrap .copy:hover { color: var(--ink-100); border-color: var(--accent); }
+  .codewrap pre { background: var(--ink-950); border: 1px solid var(--ink-800); border-radius: 12px; padding: 34px 14px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.65; color: var(--ink-200); }
 
   /* ── Flashcards ─────────────────────────────────────── */
   .fc-scene { perspective: 1200px; }
@@ -181,23 +245,24 @@
     font-size: 15.5px; line-height: 1.5;
   }
   .fc-front { background: linear-gradient(145deg, var(--ink-800), var(--ink-850)); color: var(--ink-100); font-weight: 600; }
-  .fc-back { background: linear-gradient(145deg, #241a4d, var(--ink-850)); transform: rotateY(180deg); color: var(--ink-200); }
+  .fc-back { background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 22%, var(--ink-900)), var(--ink-850)); transform: rotateY(180deg); color: var(--ink-200); }
   .fc-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
   .fc-nav .count { font-size: 12.5px; color: var(--ink-400); }
   .fc-nav .grp { display: flex; gap: 6px; }
-  .fc-know { border-color: rgba(61,220,151,.5) !important; color: var(--mint) !important; }
+  .fc-know { border-color: color-mix(in srgb, var(--mint) 50%, transparent) !important; color: var(--mint) !important; }
   .fc-hint { text-align: center; font-size: 11px; color: var(--ink-400); margin-top: 8px; letter-spacing: .06em; text-transform: uppercase; }
 
   /* ── Roadmap ────────────────────────────────────────── */
-  .roadmap { display: flex; flex-direction: column; gap: 0; }
+  .roadmap { display: flex; flex-direction: column; }
   .step { display: flex; gap: 14px; }
   .step .rail { display: flex; flex-direction: column; align-items: center; }
   .step .dot {
     width: 26px; height: 26px; border-radius: 50%; flex: none;
     display: grid; place-items: center; font-size: 11.5px; font-weight: 700;
-    background: var(--accent-glow); color: #fff; box-shadow: 0 0 0 4px rgba(124,92,255,.15);
+    background: var(--accent); color: var(--ink-950);
+    box-shadow: 0 0 0 4px var(--accent-dim);
   }
-  .step .line { width: 2px; flex: 1; background: linear-gradient(var(--accent-glow), var(--ink-700)); min-height: 14px; margin: 4px 0; }
+  .step .line { width: 2px; flex: 1; background: linear-gradient(var(--accent), var(--ink-700)); min-height: 14px; margin: 4px 0; }
   .step:last-child .line { display: none; }
   .step .body { padding-bottom: 18px; }
   .step .label { color: var(--ink-100); font-weight: 600; font-size: 14.5px; }
@@ -206,7 +271,7 @@
   /* ── Glossary / resources ───────────────────────────── */
   .gloss dt { color: var(--accent-soft); font-weight: 700; font-size: 13.5px; margin-top: 10px; }
   .gloss dd { color: var(--ink-300); font-size: 13.5px; line-height: 1.55; margin-top: 2px; }
-  .res-link { display: block; padding: 4px 0; }
+  .res-link { display: block; padding: 4px 0; word-break: break-all; }
   .res-src { display: inline-block; font-size: 11px; color: var(--ink-400); border: 1px solid var(--ink-700); border-radius: 99px; padding: 1px 9px; margin-bottom: 8px; }
   .res-desc { font-size: 13.5px; color: var(--ink-300); line-height: 1.55; }
 
@@ -219,7 +284,7 @@
   /* ── Empty / picker states ──────────────────────────── */
   .empty { max-width: 640px; margin: 12vh auto; text-align: center; padding: 0 20px; }
   .empty .big { font-size: 54px; margin-bottom: 18px; }
-  .empty h2 { color: var(--ink-100); font-size: 24px; margin-bottom: 10px; }
+  .empty h2 { color: var(--ink-100); font-size: 24px; margin-bottom: 10px; font-family: var(--font-display); }
   .empty p { color: var(--ink-400); line-height: 1.7; font-size: 15px; }
   .empty code { background: var(--ink-850); border: 1px solid var(--ink-700); border-radius: 7px; padding: 2px 9px; color: var(--accent-soft); font-size: .9em; }
   .boardlist { margin: 26px auto 0; display: flex; flex-direction: column; gap: 10px; max-width: 460px; }
@@ -240,18 +305,18 @@
 
   .toast {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-    background: var(--ink-800); border: 1px solid var(--accent-glow); color: var(--ink-100);
+    background: var(--ink-800); border: 1px solid var(--accent); color: var(--ink-100);
     border-radius: 12px; padding: 10px 20px; font-size: 13.5px; opacity: 0;
     transition: all .3s ease; z-index: 100; pointer-events: none;
   }
   .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
   @media print {
-    body { background: #fff !important; color: #222; }
+    body { background: white !important; color: #111 !important; }
     header, .no-print { display: none !important; }
     .card { border-color: #ddd; background: #fff; box-shadow: none !important; break-inside: avoid; }
-    .card h2, .step .label, .md strong, .md h3 { color: #111; }
-    .md, .md td, .step .detail { color: #333; }
+    .card h2, .step .label, .md strong, .md h3 { color: #111 !important; }
+    .md, .md td, .step .detail { color: #333 !important; }
   }
 </style>
 </head>
@@ -281,13 +346,25 @@
 
 /* ════════════════════════════════════════════════════════════════════
    Superlearn app — vanilla JS, zero build step.
-   Boards come from the local server (/api/boards); progress (quiz scores,
-   known flashcards) is kept in localStorage per board.
+   Boards come from the local server (/api/boards). The board's own
+   `theme` decides the page identity; the app hot-reloads whenever the
+   running Claude Code session updates the board on disk.
    ════════════════════════════════════════════════════════════════════ */
+
+const THEMES = {
+  midnight:  { dark: true },
+  blueprint: { dark: true },
+  terminal:  { dark: true },
+  paper:     { dark: false },
+  sepia:     { dark: false },
+  arctic:    { dark: false },
+};
+const HEX = /^#[0-9a-fA-F]{6}$/;
 
 const state = {
   boards: [],        // summaries
   board: null,       // full board
+  boardRaw: "",      // serialized board for change detection
   view: "board",
   query: "",
 };
@@ -316,6 +393,23 @@ function el(tag, attrs = {}, children = []) {
     node.append(c.nodeType ? c : document.createTextNode(c));
   }
   return node;
+}
+
+/* ── Theme application ─────────────────────────────────────────────── */
+
+function applyTheme(theme) {
+  const preset = THEMES[theme?.preset] ? theme.preset : "midnight";
+  document.documentElement.dataset.theme = preset;
+  const root = document.documentElement.style;
+  if (theme?.accent && HEX.test(theme.accent)) {
+    root.setProperty("--accent", theme.accent);
+  } else {
+    root.removeProperty("--accent"); // fall back to the preset's accent
+  }
+}
+
+function currentThemeIsDark() {
+  return THEMES[document.documentElement.dataset.theme]?.dark !== false;
 }
 
 /* ── Markdown (escape-first, so model output can't inject markup) ──── */
@@ -402,38 +496,55 @@ function md2html(src) {
   return out.join("");
 }
 
-/* ── Mermaid (CDN, lazy, graceful fallback) ────────────────────────── */
+/* ── Mermaid (CDN, lazy, theme-aware, graceful fallback) ───────────── */
 
-let mermaidPromise = null;
+let mermaidLib = null;
+let mermaidLoading = null;
+let mermaidThemeKey = "";
+
 function loadMermaid() {
-  if (mermaidPromise) return mermaidPromise;
-  mermaidPromise = new Promise((resolve, reject) => {
+  if (mermaidLib) return Promise.resolve(mermaidLib);
+  if (mermaidLoading) return mermaidLoading;
+  mermaidLoading = new Promise((resolve, reject) => {
     const s = document.createElement("script");
     s.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
-    s.onload = () => {
-      try {
-        window.mermaid.initialize({
-          startOnLoad: false, theme: "dark", securityLevel: "strict",
-          fontFamily: "inherit",
-          themeVariables: {
-            background: "#12121a", primaryColor: "#2a2a3d", primaryTextColor: "#ececf4",
-            primaryBorderColor: "#7c5cff", lineColor: "#8a8aa3",
-            secondaryColor: "#1d1d2b", tertiaryColor: "#171724",
-          },
-        });
-        resolve(window.mermaid);
-      } catch (e) { reject(e); }
-    };
+    s.onload = () => { mermaidLib = window.mermaid; resolve(mermaidLib); };
     s.onerror = () => reject(new Error("mermaid load failed"));
     document.head.appendChild(s);
   });
-  return mermaidPromise;
+  return mermaidLoading;
+}
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function configureMermaid(m) {
+  const key = document.documentElement.dataset.theme + "|" + cssVar("--accent");
+  if (key === mermaidThemeKey) return;
+  mermaidThemeKey = key;
+  const dark = currentThemeIsDark();
+  m.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme: dark ? "dark" : "default",
+    fontFamily: "inherit",
+    themeVariables: {
+      background: cssVar("--ink-900"),
+      primaryColor: cssVar("--ink-800"),
+      primaryTextColor: cssVar("--ink-100"),
+      primaryBorderColor: cssVar("--accent"),
+      lineColor: cssVar("--ink-400"),
+      secondaryColor: cssVar("--ink-850"),
+      tertiaryColor: cssVar("--ink-850"),
+    },
+  });
 }
 
 let mermaidSeq = 0;
 function renderMermaid(host, source) {
   loadMermaid()
-    .then((m) => m.render(`mmd${++mermaidSeq}`, source))
+    .then((m) => { configureMermaid(m); return m.render(`mmd${++mermaidSeq}`, source); })
     .then(({ svg }) => { host.innerHTML = svg; })
     .catch(() => {
       host.innerHTML = `<pre style="width:100%;overflow-x:auto;background:var(--ink-950);border:1px solid var(--ink-800);border-radius:12px;padding:14px;font-size:12px;color:var(--ink-300)"><code>${esc(source)}</code></pre>`;
@@ -454,8 +565,8 @@ function saveProgress(p) { localStorage.setItem(progressKey(), JSON.stringify(p)
 const KICKERS = {
   summary: ["◎", "Overview"], concept: ["◆", "Concept"], note: ["✎", "Note"],
   video: ["▶", "Watch"], diagram: ["⬡", "Diagram"], code: ["⌘", "Code"],
-  quiz: ["?", "Quiz"], flashcards: ["⧉", "Flashcards"], resource: ["↗", "Resource"],
-  roadmap: ["⚑", "Roadmap"], glossary: ["✱", "Glossary"],
+  flashcards: ["⧉", "Recall"], resource: ["↗", "Go deeper"],
+  roadmap: ["⚑", "Plan"], glossary: ["✱", "Glossary"],
 };
 const ACCENTS = ["var(--accent)", "var(--coral)", "var(--mint)", "var(--gold)", "var(--sky)"];
 
@@ -488,7 +599,6 @@ function renderBlock(block, index) {
       break;
     }
     case "code": card.append(renderCode(block)); break;
-    case "quiz": card.append(renderQuiz(block)); break;
     case "flashcards": card.append(renderFlashcards(block)); break;
 
     case "resource": {
@@ -579,70 +689,6 @@ function renderCode(block) {
   return out;
 }
 
-function renderQuiz(block) {
-  const wrap = el("div");
-  const progress = loadProgress();
-  const answered = progress.quiz?.[block.id ?? block.title] ?? {};
-  let score = Object.values(answered).filter((a) => a.correct).length;
-
-  const scoreLine = el("div", { class: "quiz-score" });
-  const updateScore = () => {
-    const total = (block.questions ?? []).length;
-    const done = Object.keys(answered).length;
-    scoreLine.textContent = done === 0 ? "" :
-      done < total ? `Score so far: ${score}/${done}` : `Final score: ${score}/${total} ${score === total ? "🏆" : score >= total * 0.7 ? "✨" : "— review and retry!"}`;
-  };
-
-  (block.questions ?? []).forEach((q, qi) => {
-    const qEl = el("div", { class: "quiz-q" });
-    qEl.append(el("div", { class: "qtext" }, [`${qi + 1}. ${q.question}`]));
-    const prior = answered[qi];
-
-    const buttons = (q.options ?? []).map((opt, oi) => {
-      const b = el("button", { class: "quiz-opt" }, [opt]);
-      if (prior) {
-        b.disabled = true;
-        if (oi === q.answerIndex) b.classList.add("correct");
-        else if (oi === prior.picked && !prior.correct) b.classList.add("wrong");
-      }
-      b.addEventListener("click", () => {
-        if (answered[qi]) return;
-        const correct = oi === q.answerIndex;
-        answered[qi] = { picked: oi, correct };
-        if (correct) score++;
-        buttons.forEach((btn, bi) => {
-          btn.disabled = true;
-          if (bi === q.answerIndex) btn.classList.add("correct");
-          else if (bi === oi) btn.classList.add("wrong");
-        });
-        if (q.explanation) qEl.append(el("div", { class: "quiz-expl" }, [q.explanation]));
-        const p = loadProgress();
-        p.quiz = p.quiz ?? {};
-        p.quiz[block.id ?? block.title] = answered;
-        saveProgress(p);
-        updateScore();
-      });
-      return b;
-    });
-    buttons.forEach((b) => qEl.append(b));
-    if (prior?.correct === false && q.explanation) qEl.append(el("div", { class: "quiz-expl" }, [q.explanation]));
-    wrap.append(qEl);
-  });
-
-  updateScore();
-  wrap.append(scoreLine);
-
-  const reset = el("button", { class: "btn no-print", style: "margin-top:6px;font-size:12px" }, ["Reset quiz"]);
-  reset.addEventListener("click", () => {
-    const p = loadProgress();
-    if (p.quiz) delete p.quiz[block.id ?? block.title];
-    saveProgress(p);
-    render();
-  });
-  wrap.append(reset);
-  return wrap;
-}
-
 function renderFlashcards(block) {
   const cards = block.cards ?? [];
   const key = block.id ?? block.title;
@@ -714,7 +760,8 @@ function renderFlashcards(block) {
 
 function visibleBlocks() {
   const q = state.query.trim().toLowerCase();
-  let blocks = state.board?.blocks ?? [];
+  // "quiz" blocks from older boards are ignored — Superlearn is depth-first.
+  let blocks = (state.board?.blocks ?? []).filter((b) => b.type !== "quiz");
   if (q) {
     blocks = blocks.filter((b) => JSON.stringify(b).toLowerCase().includes(q));
   }
@@ -727,7 +774,7 @@ function overviewMindmap(board) {
   const lines = ["mindmap", `  root((${safe(board.title)}))`];
   const groups = {
     Concepts: board.blocks.filter((b) => b.type === "concept"),
-    Practice: board.blocks.filter((b) => ["quiz", "flashcards", "code"].includes(b.type)),
+    Practice: board.blocks.filter((b) => ["flashcards", "code"].includes(b.type)),
     Watch: board.blocks.filter((b) => b.type === "video"),
     Read: board.blocks.filter((b) => b.type === "resource"),
   };
@@ -758,7 +805,7 @@ function render() {
   const meta = el("div", { class: "meta" });
   meta.append(el("span", { class: "chip accent" }, [board.topic ?? ""]));
   if (board.depth) meta.append(el("span", { class: "chip" }, [board.depth]));
-  meta.append(el("span", { class: "chip" }, [`${board.blocks.length} blocks`]));
+  meta.append(el("span", { class: "chip" }, [`${visibleBlocks().length || board.blocks.length} blocks`]));
   if (board.createdAt) meta.append(el("span", {}, [new Date(board.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })]));
   hero.append(meta);
   app.append(hero);
@@ -890,7 +937,9 @@ async function selectBoard(id, view) {
     const res = await fetch(`/api/boards/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error();
     state.board = await res.json();
+    state.boardRaw = JSON.stringify(state.board);
     state.view = view ?? state.board.layout ?? "board";
+    applyTheme(state.board.theme);
     location.hash = `#b=${encodeURIComponent(id)}&v=${state.view}`;
     render();
     window.scrollTo({ top: 0 });
@@ -939,6 +988,44 @@ window.addEventListener("hashchange", () => {
   else if (view && view !== state.view && state.board) { state.view = view; render(); }
 });
 
+/* ── Live updates from the Claude Code session ─────────────────────── */
+
+async function pollForUpdates() {
+  const beforeList = JSON.stringify(state.boards.map((b) => b.id));
+  await fetchBoards();
+  const afterList = JSON.stringify(state.boards.map((b) => b.id));
+
+  if (beforeList !== afterList) {
+    syncChrome();
+    if (!state.board && state.boards.length > 0) {
+      selectBoard(state.boards[0].id);
+      return;
+    }
+    toast("New board available — check the picker");
+  }
+
+  // Hot-reload the open board when Claude Code updates it on disk.
+  if (state.board) {
+    try {
+      const res = await fetch(`/api/boards/${encodeURIComponent(state.board.id)}`);
+      if (!res.ok) return;
+      const fresh = await res.json();
+      const freshRaw = JSON.stringify(fresh);
+      if (freshRaw !== state.boardRaw) {
+        const scrollY = window.scrollY;
+        state.board = fresh;
+        state.boardRaw = freshRaw;
+        applyTheme(fresh.theme);
+        render();
+        window.scrollTo({ top: scrollY });
+        toast("✦ Board updated with new material");
+      }
+    } catch {
+      // server briefly unreachable — try again next tick
+    }
+  }
+}
+
 /* ── Boot ──────────────────────────────────────────────────────────── */
 
 (async function boot() {
@@ -948,17 +1035,7 @@ window.addEventListener("hashchange", () => {
   if (target) await selectBoard(target, view);
   else render();
 
-  // Keep the board list fresh — new boards from Claude Code show up live.
-  setInterval(async () => {
-    const before = JSON.stringify(state.boards.map((b) => b.id));
-    await fetchBoards();
-    const after = JSON.stringify(state.boards.map((b) => b.id));
-    if (before !== after) {
-      syncChrome();
-      if (!state.board && state.boards.length > 0) selectBoard(state.boards[0].id);
-      else toast("New board available — check the picker");
-    }
-  }, 8000);
+  setInterval(pollForUpdates, 4000);
 })();
 </script>
 </body>

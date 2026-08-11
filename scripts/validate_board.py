@@ -18,8 +18,10 @@ import sys
 import urllib.parse
 
 YT_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 LAYOUTS = {"board", "notes", "grid", "mindmap", "feed"}
 DEPTHS = {"overview", "standard", "deep"}
+THEMES = {"midnight", "blueprint", "terminal", "paper", "sepia", "arctic"}
 
 errors: list[str] = []
 warnings: list[str] = []
@@ -92,23 +94,11 @@ def check_block(b, i: int) -> None:
         req_str(b, "code", where)
         req_str(b, "language", where)
     elif btype == "quiz":
-        qs = b.get("questions")
-        if not isinstance(qs, list) or not qs:
-            err(f"{where}: quiz needs a non-empty 'questions' array")
-            return
-        for qi, q in enumerate(qs):
-            qw = f"{where}.questions[{qi}]"
-            if not isinstance(q, dict):
-                err(f"{qw}: not an object")
-                continue
-            req_str(q, "question", qw)
-            opts = q.get("options")
-            if not isinstance(opts, list) or len(opts) < 2:
-                err(f"{qw}: needs >=2 options")
-                continue
-            ai = q.get("answerIndex")
-            if not isinstance(ai, int) or not (0 <= ai < len(opts)):
-                err(f"{qw}: answerIndex must be an int in [0, {len(opts) - 1}]")
+        err(
+            f"{where}: quiz blocks are not part of Superlearn — this is a "
+            "depth-first learning tool. Fold the key checks into concepts, "
+            "notes, or flashcards instead."
+        )
     elif btype == "flashcards":
         cards = b.get("cards")
         if not isinstance(cards, list) or not cards:
@@ -167,6 +157,23 @@ def main() -> int:
         warn(f"board: 'layout' should be one of {sorted(LAYOUTS)}")
     if board.get("depth") not in DEPTHS:
         warn(f"board: 'depth' should be one of {sorted(DEPTHS)}")
+
+    theme = board.get("theme")
+    if theme is None:
+        warn(
+            "board: no 'theme' set — choose one deliberately "
+            f"({sorted(THEMES)}) instead of defaulting"
+        )
+    elif not isinstance(theme, dict):
+        err("board: 'theme' must be an object like {\"preset\": \"paper\"}")
+    else:
+        if theme.get("preset") not in THEMES:
+            err(f"board: theme.preset must be one of {sorted(THEMES)}")
+        accent = theme.get("accent")
+        if accent is not None and (
+            not isinstance(accent, str) or not HEX_COLOR.match(accent)
+        ):
+            err("board: theme.accent must be a 6-digit hex color like '#8a2d3b'")
 
     blocks = board.get("blocks")
     if not isinstance(blocks, list) or not blocks:

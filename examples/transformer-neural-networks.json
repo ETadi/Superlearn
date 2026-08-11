@@ -6,6 +6,7 @@
   "createdAt": "2026-08-10T12:00:00Z",
   "depth": "standard",
   "layout": "board",
+  "theme": { "preset": "blueprint" },
   "blocks": [
     {
       "type": "summary",
@@ -67,60 +68,9 @@
       "markdown": "- **Attention is a soft dictionary lookup.** A query fuzzy-matches all keys and returns a weighted blend of values — differentiable, so it's learnable.\n- **The FFN is where facts live; attention is where routing happens.** Roughly two-thirds of parameters are in feed-forward layers.\n- **Residual stream as a shared whiteboard**: each layer reads from and writes small updates onto a running vector per token.\n- **Beware the quadratic**: attention costs O(n²) in sequence length — this is why long context is hard and why FlashAttention, sliding windows, and sparse variants exist."
     },
     {
-      "type": "quiz",
-      "title": "Check your understanding",
-      "questions": [
-        {
-          "question": "Why are attention scores divided by √d_k?",
-          "options": [
-            "To keep dot products from growing large and saturating the softmax",
-            "To normalize the value vectors",
-            "To make training deterministic",
-            "It's an arbitrary convention"
-          ],
-          "answerIndex": 0,
-          "explanation": "Large dot products push softmax into regions with tiny gradients; scaling by √d_k keeps scores in a healthy range."
-        },
-        {
-          "question": "What does multi-head attention add over a single head?",
-          "options": [
-            "It makes attention run faster",
-            "Multiple learned relationship patterns attended to in parallel subspaces",
-            "It removes the need for positional encoding",
-            "It reduces parameter count"
-          ],
-          "answerIndex": 1,
-          "explanation": "Each head has its own Q/K/V projections and can specialize — syntax, coreference, locality — simultaneously."
-        },
-        {
-          "question": "Why do transformers need positional encodings at all?",
-          "options": [
-            "To speed up convergence",
-            "Because embeddings are too small",
-            "Because self-attention is permutation-invariant — without positions, word order is invisible",
-            "To prevent overfitting"
-          ],
-          "answerIndex": 2,
-          "explanation": "Attention over a shuffled sequence gives identical (shuffled) results; position must be injected explicitly."
-        },
-        {
-          "question": "GPT-style models are…",
-          "options": [
-            "Encoder-only transformers",
-            "Decoder-only transformers with causal masking",
-            "Encoder-decoder transformers",
-            "Recurrent networks with attention"
-          ],
-          "answerIndex": 1,
-          "explanation": "They use a causal mask so each token attends only to the past, trained on next-token prediction."
-        },
-        {
-          "question": "The computational cost of vanilla self-attention grows with sequence length n as…",
-          "options": ["O(n)", "O(n log n)", "O(n²)", "O(2ⁿ)"],
-          "answerIndex": 2,
-          "explanation": "Every token attends to every other token — an n×n score matrix."
-        }
-      ]
+      "type": "note",
+      "title": "Going deeper: the frontier",
+      "markdown": "Where the research conversation is right now:\n\n- **Efficient attention** — FlashAttention reorganizes the computation around GPU memory hierarchy; sliding-window and sparse patterns trade global view for O(n) cost.\n- **Mixture-of-experts** — replace each FFN with many expert FFNs and route each token to a few; frontier models get more capacity per FLOP this way.\n- **Long context** — RoPE scaling, attention sinks, and KV-cache compression push windows from 2K tokens (2019) to 1M+ (today).\n- **Interpretability** — induction heads, superposition, and circuit analysis are beginning to explain *why* transformers generalize.\n\nOpen problems worth watching: reasoning beyond pattern matching, sample efficiency vs humans, and whether attention is the final architecture or just the current one."
     },
     {
       "type": "flashcards",
