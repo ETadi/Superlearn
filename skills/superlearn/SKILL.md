@@ -28,7 +28,7 @@ Create this layout in the current working directory (keep it out of git — it's
 
 ```
 .superlearn/
-├── research/
+├── research/<slug>/     # one research trail PER TOPIC — never overwritten
 │   ├── plan.md          # curriculum plan + subtopic checklist
 │   ├── raw/             # scraper output (JSON)
 │   └── notes/           # your synthesized notes, one file per subtopic
@@ -36,7 +36,7 @@ Create this layout in the current working directory (keep it out of git — it's
 └── exports/             # standalone self-contained HTML files
 ```
 
-Derive a short kebab-case `slug` from the topic (e.g. "transformer neural networks" → `transformer-neural-networks`). Reuse the workspace if it exists; a new topic is a new board file, not a new workspace.
+Derive a short kebab-case `slug` from the topic (e.g. "transformer neural networks" → `transformer-neural-networks`). Reuse the workspace if it exists; a new topic gets its own `research/<slug>/` trail and its own board file — trails accumulate, they are never overwritten.
 
 **The research trail is a deliverable, not scratch.** Everything you collect stays on disk — the plan, every notes file, every scraper dump — and the web app exposes it through the **Research** button (the server serves `research/` read-only). Write notes knowing the user will read them.
 
@@ -46,16 +46,16 @@ Ground yourself in live data before planning. Run the bundled scrapers (Python 3
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_web.py" "<topic>" --limit 8 --read 3 \
-  --out .superlearn/research/raw/<slug>-web.json
+  --out .superlearn/research/<slug>/raw/<slug>-web.json
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_youtube.py" "<topic> tutorial" --limit 8 \
-  --out .superlearn/research/raw/<slug>-videos.json
+  --out .superlearn/research/<slug>/raw/<slug>-videos.json
 ```
 
 `scrape_web.py` returns DuckDuckGo results plus extracted article text for the top `--read` hits. `scrape_youtube.py` returns real videoIds, titles, channels and durations. Read both output files. If a scraper returns nothing (network hiccups happen), retry once with a rephrased query, then fall back to your own WebSearch/WebFetch — the pipeline must never stall on a scraper.
 
 ## Phase 2 — Curriculum plan
 
-Write `.superlearn/research/plan.md`:
+Write `.superlearn/research/<slug>/plan.md`:
 
 - A 2–3 sentence framing of the topic and who's learning it (ask the user only if the request is genuinely ambiguous).
 - A **subtopic checklist** — `- [ ] subtopic` lines. Size it to the topic: ~4–6 for a narrow topic, 8–12 for a broad one. Order from foundations to advanced.
@@ -65,9 +65,9 @@ Write `.superlearn/research/plan.md`:
 
 This is the heart of Superlearn. For **each unchecked subtopic**:
 
-1. Scrape it: `scrape_web.py "<topic> <subtopic>" --read 2 --out .superlearn/research/raw/<slug>-<n>.json`
+1. Scrape it: `scrape_web.py "<topic> <subtopic>" --read 2 --out .superlearn/research/<slug>/raw/<slug>-<n>.json`
 2. Supplement with your own WebSearch/WebFetch where the scrape is thin, plus your expert knowledge.
-3. Write `.superlearn/research/notes/<nn>-<subtopic-slug>.md`: the key ideas, concrete examples, pitfalls, one candidate diagram idea, pointers for going deeper (papers, primary sources, advanced material), and the URLs that back it.
+3. Write `.superlearn/research/<slug>/notes/<nn>-<subtopic-slug>.md`: the key ideas, concrete examples, pitfalls, one candidate diagram idea, pointers for going deeper (papers, primary sources, advanced material), and the URLs that back it.
 4. Tick the checkbox in `plan.md`.
 
 Repeat until **every** box is ticked. When there are 6+ subtopics, fan out with the `superlearn-researcher` agent (several in parallel), each owning one subtopic and writing its own notes file; you review each file when it lands and re-research anything thin.
@@ -183,6 +183,7 @@ Rules for iteration: **edit surgically** — never regenerate the whole board fo
 
 ## Quality bar
 
+- **Complete, never trimmed**: a block is as long as the teaching requires — markdown fields can be essays with multiple sections, worked examples, and tables. Never compress content below usefulness, never cut material to "keep cards short", never summarize where you could teach. The app is built for long-form: cards grow, nothing is clipped. If a concept needs 600 words, write 600 words; if a topic needs 20 blocks, write 20 blocks.
 - **Grounded**: claims trace to research notes; no invented URLs or videoIds — the validator and the app both enforce this, but you enforce it first.
 - **Deep, not gamified**: this is a tool for people who want mastery. No quizzes, no filler engagement mechanics. Advanced sections, primary sources, open problems, and honest complexity belong on the board.
 - **Taught, not listed**: prefer "here's the idea, here's an example, here's the pitfall" over bullet dumps.

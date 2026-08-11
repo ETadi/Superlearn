@@ -11,11 +11,11 @@ Method:
 1. Scrape live data first:
    ```bash
    python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_web.py" "<topic> <subtopic>" --limit 6 --read 2 \
-     --out .superlearn/research/raw/<given-raw-filename>.json
+     --out .superlearn/research/<slug>/raw/<given-raw-filename>.json
    ```
    Read the output. If it's empty, retry once with a rephrased query, then fall back to WebSearch/WebFetch.
 2. Supplement with your own WebSearch/WebFetch for anything the scrape left thin, and with your expert knowledge for depth.
-3. Write the notes file you were assigned (`.superlearn/research/notes/<nn>-<subtopic-slug>.md`) containing:
+3. Write the notes file you were assigned (`.superlearn/research/<slug>/notes/<nn>-<subtopic-slug>.md`) containing:
    - **Key ideas** — the 3–6 things a learner must understand, each explained in 2–4 sentences with a concrete example.
    - **Pitfalls & misconceptions** — what beginners get wrong.
    - **Diagram idea** — one structure worth drawing (describe nodes/edges so the author can write Mermaid).

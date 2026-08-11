@@ -153,11 +153,18 @@ def main() -> int:
     ap.add_argument("query", help="search query")
     ap.add_argument("--limit", type=int, default=8, help="max search results")
     ap.add_argument("--read", type=int, default=0, help="extract article text for top N results")
+    ap.add_argument(
+        "--max-chars", type=int, default=6000,
+        help="max characters captured per article (raise for deep runs)",
+    )
     ap.add_argument("--out", help="write JSON here (default: stdout)")
     args = ap.parse_args()
 
     results = search_duckduckgo(args.query, args.limit)
-    articles = [extract_article(r["url"]) for r in results[: max(args.read, 0)]]
+    articles = [
+        extract_article(r["url"], max_chars=max(args.max_chars, 500))
+        for r in results[: max(args.read, 0)]
+    ]
     articles = [a for a in articles if a["text"]]
 
     payload = {"query": args.query, "results": results, "articles": articles}
