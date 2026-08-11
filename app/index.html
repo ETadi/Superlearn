@@ -249,7 +249,6 @@
   .fc-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; }
   .fc-nav .count { font-size: 12.5px; color: var(--ink-400); }
   .fc-nav .grp { display: flex; gap: 6px; }
-  .fc-know { border-color: color-mix(in srgb, var(--mint) 50%, transparent) !important; color: var(--mint) !important; }
   .fc-hint { text-align: center; font-size: 11px; color: var(--ink-400); margin-top: 8px; letter-spacing: .06em; text-transform: uppercase; }
 
   /* ── Roadmap ────────────────────────────────────────── */
@@ -510,6 +509,21 @@ function esc(s) {
     .replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
+/**
+ * Boards are shareable files, so their URLs are untrusted input: a hostile
+ * board could set a resource/source url to `javascript:…` and turn a normal
+ * click into script execution. Anything that isn't plain http(s) is refused.
+ */
+function safeUrl(u) {
+  if (typeof u !== "string") return null;
+  try {
+    const parsed = new URL(u, window.location.href);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -689,8 +703,6 @@ function loadProgressFor(id) {
   catch { return {}; }
 }
 function saveProgressFor(id, p) { localStorage.setItem(progressKeyFor(id), JSON.stringify(p)); }
-function loadProgress() { return loadProgressFor(state.board?.id ?? "none"); }
-function saveProgress(p) { saveProgressFor(state.board?.id ?? "none", p); }
 
 /* ── Spaced repetition (SM-2-lite) ─────────────────────────────────── */
 
@@ -738,16 +750,6 @@ function dueText(s) {
   if (ms <= 0) return "due now";
   if (ms < DAY) return "due in <1d";
   return `due in ${Math.round(ms / DAY)}d`;
-}
-
-/** Cards due (or never seen) in one flashcards block. */
-function dueCards(boardId, block) {
-  const p = loadProgressFor(boardId);
-  const key = block.id ?? block.title;
-  return (block.cards ?? []).filter((c) => {
-    const s = srsState(p, srsKey(key, c.front));
-    return (s.due ?? 0) <= Date.now();
-  });
 }
 
 /* ── What's-new detection (per board, per browser) ─────────────────── */
@@ -811,8 +813,13 @@ function renderBlock(block, index) {
     case "flashcards": card.append(renderFlashcards(block)); break;
 
     case "resource": {
+      const href = safeUrl(block.url);
       card.append(el("span", { class: "res-src" }, [block.source ?? hostOf(block.url)]));
-      card.append(el("a", { class: "res-link", href: block.url ?? "#", target: "_blank", rel: "noopener noreferrer" }, [block.url ?? ""]));
+      card.append(
+        href
+          ? el("a", { class: "res-link", href, target: "_blank", rel: "noopener noreferrer" }, [href])
+          : el("p", { class: "res-link", title: "Only http(s) links are opened" }, [`⚠ unsupported link: ${block.url ?? ""}`]),
+      );
       if (block.description) card.append(el("p", { class: "res-desc" }, [block.description]));
       break;
     }
@@ -1214,8 +1221,13 @@ function render() {
     src.append(el("h3", {}, ["Research sources"]));
     const ul = el("ul");
     for (const s of board.sources) {
+      const href = safeUrl(s.url);
       const li = el("li");
-      li.append(el("a", { href: s.url, target: "_blank", rel: "noopener noreferrer" }, [s.title ?? s.url]));
+      li.append(
+        href
+          ? el("a", { href, target: "_blank", rel: "noopener noreferrer" }, [s.title ?? href])
+          : el("span", {}, [`⚠ ${s.title ?? s.url ?? ""} (unsupported link)`]),
+      );
       li.append(el("span", { class: "host" }, [hostOf(s.url)]));
       ul.append(li);
     }

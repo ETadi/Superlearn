@@ -22,8 +22,23 @@ APP_HTML = Path(__file__).resolve().parent.parent / "app" / "index.html"
 
 def build_standalone_html(app_html: str, board: dict) -> str:
     """Injects the board as window.SUPERLEARN_EMBEDDED_BOARD before the app
-    script; the app detects it and renders without a server."""
-    payload = json.dumps(board, ensure_ascii=False).replace("</", "<\\/")
+    script; the app detects it and renders without a server.
+
+    Board text can contain anything the web gave the model, so the payload is
+    neutralized for HTML script context: every `<` becomes the JSON escape
+    `\\u003c`. That kills `</script>` breakout *and* the subtler
+    `<!--<script` sequence, which flips the HTML parser into the script-data
+    double-escaped state where our own closing tag would stop terminating the
+    script. U+2028/U+2029 are escaped too — legal in JSON strings, historically
+    illegal in JS string literals. All of these round-trip back to the original
+    characters via JSON.parse.
+    """
+    payload = (
+        json.dumps(board, ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace("\u2028", "\\u2028")
+        .replace("\u2029", "\\u2029")
+    )
     inject = f"<script>window.SUPERLEARN_EMBEDDED_BOARD = {payload};</script>"
     idx = app_html.index("<script>")
     return app_html[:idx] + inject + "\n" + app_html[idx:]

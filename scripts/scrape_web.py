@@ -66,60 +66,81 @@ def resolve_ddg_url(href: str) -> str | None:
         return None
 
 
-def _assemble(links: list[tuple[str, str]], snippets: list[str], limit: int) -> list[dict]:
+def _assemble(links: list[tuple[str, str, str]], limit: int) -> list[dict]:
+    """Dedupes by URL and caps at `limit`."""
     results: list[dict] = []
     seen: set[str] = set()
-    for i, (url, title) in enumerate(links):
+    for url, title, snippet in links:
         if url in seen:
             continue
         seen.add(url)
-        results.append(
-            {"title": title, "url": url, "snippet": snippets[i] if i < len(snippets) else ""}
-        )
+        results.append({"title": title, "url": url, "snippet": snippet})
         if len(results) >= limit:
             break
     return results
 
 
-def parse_html_results(page: str, limit: int) -> list[dict]:
-    """Parses the html.duckduckgo.com endpoint (class-based markup)."""
-    links: list[tuple[str, str]] = []
-    for m in re.finditer(
-        r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-        page,
-        re.S,
-    ):
+def parse_results(page: str, link_re: str, snippet_re: str, limit: int) -> list[dict]:
+    """Extracts (url, title, snippet) triples from a SERP.
+
+    Snippets are matched to links by *position in the page*, not by list
+    index: a snippet belongs to the last link that appeared before it. Anchors
+    dropped by resolve_ddg_url (internal nav, ad redirectors) therefore can't
+    shift every following result onto the wrong snippet.
+    """
+    snippets = [
+        (m.start(), strip_tags(m.group(1)))
+        for m in re.finditer(snippet_re, page, re.S)
+    ]
+
+    links: list[tuple[str, str, str]] = []
+    kept_positions: list[int] = []
+    for m in re.finditer(link_re, page, re.S):
         url = resolve_ddg_url(html.unescape(m.group(1)))
         title = strip_tags(m.group(2))
         if url and title:
-            links.append((url, title))
+            links.append((url, title, ""))
+            kept_positions.append(m.start())
 
-    snippets = [
-        strip_tags(m.group(1))
-        for m in re.finditer(
-            r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>', page, re.S
-        )
-    ]
-    return _assemble(links, snippets, limit)
+    # Attach each snippet to the nearest preceding kept link.
+    paired = [list(t) for t in links]
+    for pos, text in snippets:
+        owner = -1
+        for i, link_pos in enumerate(kept_positions):
+            if link_pos < pos:
+                owner = i
+            else:
+                break
+        if owner >= 0 and not paired[owner][2]:
+            paired[owner][2] = text
+
+    return _assemble([(u, t, s) for u, t, s in paired], limit)
+
+
+HTML_LINK_RE = r'<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>'
+HTML_SNIPPET_RE = r'<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>'
+LITE_LINK_RE = r'<a[^>]+class="[^"]*result-link[^"]*"[^>]+href="([^"]+)"[^>]*>(.*?)</a>'
+LITE_LINK_RE_LOOSE = r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>'
+LITE_SNIPPET_RE = r'<td[^>]+class="[^"]*result-snippet[^"]*"[^>]*>(.*?)</td>'
+
+
+def parse_html_results(page: str, limit: int) -> list[dict]:
+    """The html.duckduckgo.com endpoint (class-based markup)."""
+    return parse_results(page, HTML_LINK_RE, HTML_SNIPPET_RE, limit)
 
 
 def parse_lite_results(page: str, limit: int) -> list[dict]:
-    """Parses the lite.duckduckgo.com endpoint (plain-table markup) — a
-    different, simpler page that tends to survive redesigns of the main one."""
-    links: list[tuple[str, str]] = []
-    for m in re.finditer(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', page, re.S):
-        url = resolve_ddg_url(html.unescape(m.group(1)))
-        title = strip_tags(m.group(2))
-        if url and title:
-            links.append((url, title))
+    """The lite.duckduckgo.com endpoint (plain-table markup) — a different,
+    simpler page that tends to survive redesigns of the main one.
 
-    snippets = [
-        strip_tags(m.group(1))
-        for m in re.finditer(
-            r'<td[^>]+class="[^"]*result-snippet[^"]*"[^>]*>(.*?)</td>', page, re.S
-        )
-    ]
-    return _assemble(links, snippets, limit)
+    Prefers anchors carrying lite's `result-link` class so promo/nav anchors
+    don't become fake organic results; only if that finds nothing does it fall
+    back to scanning every anchor (resilience against a markup change).
+    """
+    strict = parse_results(page, LITE_LINK_RE, LITE_SNIPPET_RE, limit)
+    if strict:
+        return strict
+    return parse_results(page, LITE_LINK_RE_LOOSE, LITE_SNIPPET_RE, limit)
 
 
 ENDPOINTS = (

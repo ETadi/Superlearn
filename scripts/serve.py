@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -54,14 +55,76 @@ def load_boards(boards_dir: Path) -> dict[str, dict]:
     return boards
 
 
+LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1", "[::1]"}
+
+
+def is_loopback_bind(host: str) -> bool:
+    """True when the server was bound to loopback only (the default)."""
+    if host.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
 class Handler(SimpleHTTPRequestHandler):
     boards_dir: Path    # set in main()
     research_dir: Path  # set in main()
+    bound_host: str = "127.0.0.1"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(APP_DIR), **kwargs)
 
     # ── helpers ──────────────────────────────────────────────────────────
+
+    def host_is_local(self) -> bool:
+        """Rejects requests carrying an attacker-controlled Host name.
+
+        Without this, a page on the public internet can point a hostname it
+        controls at 127.0.0.1 (DNS rebinding): the browser then treats that
+        origin as same-origin with this server, so the page could read every
+        board and research file and PUT arbitrary board JSON.
+
+        Rebinding needs a *DNS name*, so the rule is: loopback names always
+        pass, the address the server was actually bound to passes, and bare IP
+        literals pass whenever the operator deliberately bound beyond loopback
+        (e.g. `--host 0.0.0.0` to read boards from a phone). Any other
+        hostname is refused.
+        """
+        host = (self.headers.get("Host") or "").strip()
+        if not host:
+            return False
+        # Strip the port (but keep bracketed IPv6 literals intact).
+        if host.startswith("["):
+            hostname = host[: host.index("]") + 1] if "]" in host else host
+        else:
+            hostname = host.split(":", 1)[0]
+        hostname = hostname.lower()
+
+        if hostname in LOOPBACK_NAMES or hostname == self.bound_host.lower():
+            return True
+        # Bound beyond loopback on purpose: accept bare IPs (a rebinding
+        # attack needs a DNS name), refuse hostnames.
+        if not is_loopback_bind(self.bound_host):
+            try:
+                ipaddress.ip_address(hostname.strip("[]"))
+                return True
+            except ValueError:
+                return False
+        return False
+
+    def guard_host(self) -> bool:
+        if self.host_is_local():
+            return True
+        self.send_json(
+            {
+                "error": "forbidden: unrecognized Host header — Superlearn "
+                "serves loopback (and, when bound beyond it, bare IPs) only"
+            },
+            403,
+        )
+        return False
 
     def send_json(self, payload, status: int = 200) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -93,6 +156,8 @@ class Handler(SimpleHTTPRequestHandler):
     # ── routes ───────────────────────────────────────────────────────────
 
     def do_GET(self):  # noqa: N802 (http.server API)
+        if not self.guard_host():
+            return
         path = self.path.split("?")[0]
 
         if path == "/api/health":
@@ -180,6 +245,8 @@ class Handler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_PUT(self):  # noqa: N802
+        if not self.guard_host():
+            return
         board_id = self.board_id_from_path()
         if not board_id:
             self.send_json({"error": "not found"}, 404)
@@ -235,6 +302,7 @@ def main() -> int:
 
     boards_dir = Path(args.boards_dir).resolve()
     Handler.boards_dir = boards_dir
+    Handler.bound_host = args.host
     Handler.research_dir = (
         Path(args.research_dir).resolve()
         if args.research_dir
