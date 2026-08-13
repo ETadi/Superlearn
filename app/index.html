@@ -964,9 +964,12 @@ function el(tag, attrs = {}, children = []) {
 
 /* ── Theme application ─────────────────────────────────────────────── */
 
-const LIGHT_PRESETS = new Set(["paper", "sepia", "arctic"]);
-
 function appearanceStoreKey() { return `superlearn.appearance.${state.board?.id ?? "global"}`; }
+
+function storedAppearance() {
+  const mode = localStorage.getItem(appearanceStoreKey());
+  return ["white", "black"].includes(mode) ? mode : "auto";
+}
 
 /* The viewer can force a white or black base. Painting only the body would
    strand light text on a white page, so the mode moves the whole ink scale:
@@ -976,12 +979,13 @@ function appearanceStoreKey() { return `superlearn.appearance.${state.board?.id 
    preset, so nothing goes unreadable. */
 function applyTheme(theme) {
   let preset = THEMES[theme?.preset] ? theme.preset : "midnight";
-  const mode = localStorage.getItem(appearanceStoreKey()) ?? "auto";
+  const mode = storedAppearance();
   const root = document.documentElement.style;
   root.removeProperty("--ink-950");
   root.removeProperty("--ink-900");
-  if (mode === "white" && !LIGHT_PRESETS.has(preset)) preset = "arctic";
-  if (mode === "black" && LIGHT_PRESETS.has(preset)) preset = "midnight";
+  const isLight = THEMES[preset].dark === false;
+  if (mode === "white" && !isLight) preset = "arctic";
+  if (mode === "black" && isLight) preset = "midnight";
   document.documentElement.dataset.theme = preset;
   if (mode === "white") {
     root.setProperty("--ink-950", "#ffffff");
@@ -1003,8 +1007,10 @@ function applyTheme(theme) {
 
 function setAppearance(mode) {
   localStorage.setItem(appearanceStoreKey(), mode);
+  const scrollY = window.scrollY;
   applyTheme(state.board?.theme);
   render();   // diagrams re-render in the new palette
+  window.scrollTo({ top: scrollY });
 }
 
 function currentThemeIsDark() {
@@ -3003,7 +3009,7 @@ function applyWallpaper(key) {
     root.setProperty("--bg-repeat", wp.vars.repeat ?? "repeat");
     root.setProperty("--bg-attach", wp.vars.attach ?? "scroll");
   }
-  for (const b of document.querySelectorAll(".wp-swatch")) {
+  for (const b of document.querySelectorAll(".wp-swatch[data-wp]")) {
     b.classList.toggle("on", b.dataset.wp === wp.key);
   }
 }
@@ -3042,16 +3048,15 @@ function wireWallpaper() {
     ["black", "Black", "#000000", "#d5d9e2"],
   ]) {
     const sw = el("button", { class: "wp-swatch ap-swatch", "data-ap": mode, title: label });
-    if (mode === "auto") sw.append(el("span", { class: "wmark" }, ["✦"]));
-    else {
+    if (mode === "auto") {
+      sw.append(el("span", { class: "wmark" }, ["✦"]), el("span", { class: "wlabel" }, [label]));
+    } else {
       sw.style.backgroundColor = bg;
       const lab = el("span", { class: "wlabel" }, [label]);
       lab.style.background = "transparent";
       lab.style.color = fg;
       sw.append(lab);
-      sw.dataset.plain = "1";
     }
-    if (mode === "auto") sw.append(el("span", { class: "wlabel" }, [label]));
     sw.addEventListener("click", () => setAppearance(mode));
     baseGrid.append(sw);
   }

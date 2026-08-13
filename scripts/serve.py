@@ -28,6 +28,7 @@ import os
 import re
 import socketserver
 import sys
+import uuid
 import urllib.parse
 from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
@@ -273,10 +274,18 @@ class Handler(SimpleHTTPRequestHandler):
         board["id"] = board_id
         self.boards_dir.mkdir(parents=True, exist_ok=True)
         target = self.boards_dir / f"{board_id}.json"
-        tmp = target.with_suffix(".json.tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(board, f, indent=2, ensure_ascii=False)
-        os.replace(tmp, target)
+        # Unique per write: this server is threaded, and two concurrent saves
+        # sharing one tmp path could interleave into corrupt JSON. The dotted
+        # name also keeps it out of load_boards' *.json glob.
+        tmp = self.boards_dir / f".{board_id}.{uuid.uuid4().hex}.tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(board, f, indent=2, ensure_ascii=False)
+            os.replace(tmp, target)
+        except OSError:
+            tmp.unlink(missing_ok=True)
+            self.send_json({"error": "could not write the board"}, 500)
+            return
         self.send_json({"ok": True})
 
     def log_message(self, fmt, *args):  # quiet: only log API errors
