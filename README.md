@@ -22,7 +22,7 @@ and serves you an interactive learning board that keeps growing as you ask for m
 
 ## What it is
 
-Superlearn is a Claude Code plugin. You type `/superlearn <topic>`; it scrapes the web, YouTube, and arXiv, runs an iterative research loop until the topic is genuinely covered, synthesizes everything into a curated learning board, and launches a local web app to study it in.
+Superlearn is a Claude Code plugin. You type `/superlearn <topic>`; Claude researches the live web itself, pulls real videos from YouTube and papers from arXiv, runs an iterative research loop until the topic is genuinely covered, synthesizes everything into a curated learning board, and launches a local web app to study it in.
 
 It is built for people who want **mastery**, not a summary. There are no quizzes, no streaks, no gamification — the material is research notes, concept deep-dives, diagrams and mindmaps, curated papers, working code, and learning roadmaps. Blocks are as long as the teaching requires and nothing is trimmed.
 
@@ -70,16 +70,16 @@ A few minutes later:
         │
         ▼
  ┌─────────────────┐  Your own files in .superlearn/sources/ (PDFs, docs) are
- │ 1. SCRAPE       │  read first, then Python scrapers sweep DuckDuckGo,
- └─────────────────┘  YouTube, and arXiv — token-free, in parallel.
+ │ 1. SWEEP        │  read first, then Claude searches and reads the live web
+ └─────────────────┘  itself; scrapers fetch real YouTube IDs + arXiv papers.
         ▼
  ┌─────────────────┐  Claude writes a curriculum plan: a subtopic checklist
  │ 2. PLAN         │  sized to the topic, foundations → advanced.
  └─────────────────┘
         ▼
- ┌─────────────────┐  For every subtopic: scrape it, supplement with Claude's
- │ 3. RESEARCH ⟳   │  own web research, write dense notes, tick the box.
- └─────────────────┘  Repeat until saturated. Parallel agents on big topics.
+ ┌─────────────────┐  For every subtopic: search, read, save the evidence to
+ │ 3. RESEARCH ⟳   │  the trail, write dense notes, tick the box. Repeat
+ └─────────────────┘  until saturated. Parallel agents on big topics.
         ▼
  ┌─────────────────┐  Claude DESIGNS the page for this subject (layout +
  │ 4. DESIGN &     │  theme), authors the board — summary, roadmap, concepts,
@@ -197,7 +197,7 @@ Flashcards are scheduled with SM-2 (Again / Hard / Good / Easy, growing interval
 
 ### The full research trail, kept
 
-Every plan, note, and raw scraper dump is saved and browsable in the app — so you can always audit where a claim came from.
+Every plan, note, and raw evidence capture is saved and browsable in the app — so you can always audit where a claim came from.
 
 ![Research trail browser](docs/screenshots/research-trail.png)
 
@@ -226,7 +226,7 @@ Every plan, note, and raw scraper dump is saved and browsable in the app — so 
 ```
 .superlearn/
 ├── sources/     ← drop your own PDFs, papers, and docs here; they're read first
-├── research/    the full trail per topic — plan, synthesized notes, raw scraper output
+├── research/    the full trail per topic — plan, synthesized notes, raw evidence
 ├── boards/      portable board JSON — share with anyone who has the plugin
 └── exports/     standalone single-file HTML — opens anywhere, offline, no server
 ```
@@ -250,7 +250,6 @@ Every script is standalone, stdlib-only, and usable on its own.
 
 | Script | What it does |
 |---|---|
-| `scrape_web.py` | DuckDuckGo search + readable article extraction (two independent endpoints for resilience) |
 | `scrape_youtube.py` | Real video IDs, titles, channels, durations |
 | `scrape_arxiv.py` | Papers via the official arXiv API — abstracts, authors, PDF links |
 | `validate_board.py` | Schema, theme/mode values, video-ID format, URL validity, chart data shape, language tags, sections, highlights, canvas layout, Mermaid hygiene |
@@ -296,15 +295,18 @@ tests/             stdlib-only test suite (python3 -m unittest discover -s tests
 - **Board content is treated as untrusted** — it's authored from scraped pages. The app escapes all rendered markdown, refuses non-`http(s)` links, and pins video embeds to validated IDs; exports neutralize the payload for HTML script context.
 - **Research files are served read-only**, with path-traversal protection.
 
-## The scraped data isn't ours
+## The researched data isn't ours
 
 Superlearn researches the live web, and it's worth being plain about whose
 work that is: **not ours, and not yours.** The articles it reads, the videos
 it finds, the papers it lists — all of it belongs to the people who made it.
 The tool is built to respect that:
 
+- **Web research goes through Claude's own sanctioned search and fetch
+  tools** — there is no bundled search-engine scraper. Claude searches, reads,
+  and cites like a (very fast) research assistant.
 - **It gathers references, not copies.** Boards contain Claude's own synthesis
-  with the sources cited and linked; scraped article text lives only in your
+  with the sources cited and linked; article extracts live only in your
   private research trail on your own disk, like a read-later app.
 - **Videos play through YouTube's own embedded player** — the sanctioned path
   that serves the creator's views. Nothing is downloaded or ripped.

@@ -1,6 +1,6 @@
 ---
 name: superlearn
-description: Build an interactive learning board on any topic. Use when the user wants to learn, study, or research a subject and get a curated, visual learning experience — scrapes the web and YouTube, runs an iterative research loop into a scratch workspace, authors a validated board JSON, and serves the Superlearn web app locally. Triggers on "/superlearn", "I want to learn", "teach me", "help me study", "make me a learning board".
+description: Build an interactive learning board on any topic. Use when the user wants to learn, study, or research a subject and get a curated, visual learning experience — researches the live web with Claude's own search, scrapes YouTube and arXiv for real IDs and papers, runs an iterative research loop into a scratch workspace, authors a validated board JSON, and serves the Superlearn web app locally. Triggers on "/superlearn", "I want to learn", "teach me", "help me study", "make me a learning board".
 ---
 
 # Superlearn — the learning pipeline
@@ -20,7 +20,7 @@ Superlearn has four modes. **Default is `study`** unless the user asks otherwise
 | `research` | Map the literature and the frontier: surveys, seminal + recent papers, "state of the art", "open problems", key groups/labs. | Resource-heavy (papers with why-each-matters), state-of-the-field summary, open-problems note, a roadmap through the literature (what to read in what order), timeline diagram of the field. Layout `notes`, theme `paper`/`arctic`. |
 | `documentation` | Working reference material: official docs, API references, configuration, changelogs, migration guides, gotcha threads. | Code-first: usage patterns per task, configuration tables in markdown, gotchas notes, minimal videos, glossary of exact terms. Layout `notes`/`grid`, theme `terminal`/`blueprint`. |
 
-Mode also tunes your scraper queries in Phases 1 and 3 — an `interview` run scrapes different material than a `research` run on the same topic.
+Mode also tunes your research queries in Phases 1 and 3 — an `interview` run searches for different material than a `research` run on the same topic.
 
 ## Phase 0 — Workspace
 
@@ -30,7 +30,7 @@ Create this layout in the current working directory (keep it out of git — it's
 .superlearn/
 ├── research/<slug>/     # one research trail PER TOPIC — never overwritten
 │   ├── plan.md          # curriculum plan + subtopic checklist
-│   ├── raw/             # scraper output (JSON)
+│   ├── raw/             # research evidence: web captures (md) + scraper output (JSON)
 │   └── notes/           # your synthesized notes, one file per subtopic
 ├── boards/              # finished board JSONs the app serves
 └── exports/             # standalone self-contained HTML files
@@ -38,22 +38,22 @@ Create this layout in the current working directory (keep it out of git — it's
 
 Derive a short kebab-case `slug` from the topic (e.g. "transformer neural networks" → `transformer-neural-networks`). Reuse the workspace if it exists; a new topic gets its own `research/<slug>/` trail and its own board file — trails accumulate, they are never overwritten.
 
-**The research trail is a deliverable, not scratch.** Everything you collect stays on disk — the plan, every notes file, every scraper dump — and the web app exposes it through the **Research** button (the server serves `research/` read-only). Write notes knowing the user will read them.
+**The research trail is a deliverable, not scratch.** Everything you collect stays on disk — the plan, every notes file, every raw evidence capture — and the web app exposes it through the **Research** button (the server serves `research/` read-only). Write notes knowing the user will read them.
 
-## Phase 1 — Initial sweep (scrape first, think second)
+## Phase 1 — Initial sweep (research first, think second)
 
-Ground yourself in live data before planning. Run the bundled scrapers (Python 3 stdlib only — nothing to install):
+Ground yourself in live data before planning. **Web research is yours to do** — use your own WebSearch and WebFetch, no intermediary: search the topic from a few angles (overview, best explanations, common pitfalls, authoritative docs), fetch the most substantial pages, and read them.
+
+**Save the evidence, not just conclusions.** Everything the web research turns up — the URLs, titles, and key extracts — goes to `.superlearn/research/<slug>/raw/<slug>-web-<n>.md` as you go. The Research panel shows this trail to the user; a claim on the board should be traceable to a file in `raw/`.
+
+For videos, run the bundled scraper (Python 3 stdlib only — nothing to install):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_web.py" "<topic>" --limit 8 --read 3 \
-  --out .superlearn/research/<slug>/raw/<slug>-web.json
 python3 "${CLAUDE_PLUGIN_ROOT}/scripts/scrape_youtube.py" "<topic> tutorial" --limit 8 \
   --out .superlearn/research/<slug>/raw/<slug>-videos.json
 ```
 
-`scrape_web.py` returns DuckDuckGo results plus extracted article text for the top `--read` hits (raise `--max-chars` for deep runs; it retries a second endpoint automatically if the first yields nothing). `scrape_youtube.py` returns real videoIds, titles, channels and durations. Read both output files. If a scraper returns nothing (network hiccups happen), retry once with a rephrased query, then fall back to your own WebSearch/WebFetch — the pipeline must never stall on a scraper.
-
-**The trail stays complete on the fallback path too.** When research comes through WebSearch/WebFetch instead of a scraper, save what you found — the URLs and the key extracts, not just your conclusions — to `.superlearn/research/<slug>/raw/<slug>-fallback-<n>.md`. The Research panel must show the full evidence regardless of which path produced it.
+It returns real videoIds, titles, channels and durations — the **only** legitimate source of `video` blocks. If it returns nothing (network hiccups happen), retry once with a rephrased query; never invent an ID.
 
 **For paper-driven topics and `research` mode**, also sweep the literature:
 
@@ -78,8 +78,8 @@ Write `.superlearn/research/<slug>/plan.md`:
 
 This is the heart of Superlearn. For **each unchecked subtopic**:
 
-1. Scrape it: `scrape_web.py "<topic> <subtopic>" --read 2 --out .superlearn/research/<slug>/raw/<slug>-<n>.json`
-2. Supplement with your own WebSearch/WebFetch where the scrape is thin, plus your expert knowledge.
+1. Research it with your own WebSearch/WebFetch — a couple of searches from different angles, then fetch and read the best pages. Save the evidence (URLs + key extracts) to `.superlearn/research/<slug>/raw/<slug>-<n>.md`.
+2. Supplement with your expert knowledge for depth the web pages don't reach.
 3. Write `.superlearn/research/<slug>/notes/<nn>-<subtopic-slug>.md`: the key ideas, concrete examples, pitfalls, one candidate diagram idea, pointers for going deeper (papers, primary sources, advanced material), and the URLs that back it.
 4. Tick the checkbox in `plan.md`.
 
@@ -242,7 +242,7 @@ Run it in the background so the session stays free. Confirm it's up (`curl -s ht
 - The view switcher (Board / Notes / Grid / Mindmap / Canvas / Feed) restyles the whole experience — **Canvas** lays the entire board out as a whiteboard, one frame per section, pan and zoom like Miro.
 - **Focus** walks the board one card at a time (arrow keys), marking each card read as they go; the ✓ on any card and the progress bar under the title track how much of the board they've covered.
 - Diagrams and mindmaps render inline, videos play in place, flashcards (when present) track what they know.
-- The **Research** button opens the full research trail — plan, notes, and raw scraper output — right in the app; the same files live in `.superlearn/research/`.
+- The **Research** button opens the full research trail — plan, notes, and raw evidence — right in the app; the same files live in `.superlearn/research/`.
 - **Everything is saved on disk**: board JSON in `.superlearn/boards/`, a standalone single-file HTML in `.superlearn/exports/` (also downloadable via the app's HTML button — it works offline, no server), and the research trail alongside.
 - **Their notes live in the board**: the ✎ button on any card saves their own annotation into the board JSON — it survives exports and shares, and you read it on the next iteration.
 - **Review** runs spaced repetition across every board's flashcards (SM-2 scheduling, due counts on the button); the **Anki** button exports any deck as TSV for their existing Anki setup.
