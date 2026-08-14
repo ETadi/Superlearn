@@ -286,6 +286,7 @@ agents/            parallel subtopic researcher
 scripts/           scrapers, validator, exporter, server, publisher
 app/               the Superlearn web app (single file, zero build step)
 examples/          ready-to-serve example boards
+tests/             stdlib-only test suite (python3 -m unittest discover -s tests)
 ```
 
 ## Notes on privacy and security
@@ -295,6 +296,28 @@ examples/          ready-to-serve example boards
 - **Board content is treated as untrusted** — it's authored from scraped pages. The app escapes all rendered markdown, refuses non-`http(s)` links, and pins video embeds to validated IDs; exports neutralize the payload for HTML script context.
 - **Research files are served read-only**, with path-traversal protection.
 
+## The scraped data isn't ours
+
+Superlearn researches the live web, and it's worth being plain about whose
+work that is: **not ours, and not yours.** The articles it reads, the videos
+it finds, the papers it lists — all of it belongs to the people who made it.
+The tool is built to respect that:
+
+- **It gathers references, not copies.** Boards contain Claude's own synthesis
+  with the sources cited and linked; scraped article text lives only in your
+  private research trail on your own disk, like a read-later app.
+- **Videos play through YouTube's own embedded player** — the sanctioned path
+  that serves the creator's views. Nothing is downloaded or ripped.
+- **Papers come from the official arXiv API**, which exists for this.
+- **Volume is tiny and polite** — a handful of requests per topic, no
+  crawling, no login walls, no CAPTCHAs, no paywall circumvention, ever.
+- **Follow the links.** The resources on every board are the invitation to go
+  read the originals — that's the point of citing them.
+
+If you extend the scrapers, keep them this way: identify honestly, stay slow,
+respect a site's refusal, and never republish content you didn't write.
+
 ## License
 
-MIT
+[MIT](LICENSE). Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md);
+security reports via [SECURITY.md](SECURITY.md).
