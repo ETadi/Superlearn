@@ -1,6 +1,6 @@
 {
   "name": "superlearn",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "The world's most advanced learning system, inside Claude Code. Type /superlearn <topic> — it researches the live web, designs a page that fits the subject, and serves a local web app for deep learning: concept deep-dives, diagrams, typeset math, charts, runnable code, curated papers and lectures, a Miro-style whiteboard of the whole topic, focus mode, spaced repetition, and highlights and notes that Claude reads back — hot-reloading as you keep prompting the session.",
   "author": {
     "name": "Raiyan Yahya",
