@@ -224,6 +224,77 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
 
 
+class MultiToolTests(unittest.TestCase):
+    """The portable Agent Skill (OpenAI Codex / Kilo) and its installer."""
+
+    CANONICAL = ROOT / "skills" / "superlearn" / "SKILL.md"
+    PORTABLE = ROOT / ".agents" / "skills" / "superlearn" / "SKILL.md"
+
+    @staticmethod
+    def frontmatter_body(path: pathlib.Path):
+        text = path.read_text(encoding="utf-8")
+        _, frontmatter, body = text.split("---", 2)
+        return frontmatter, body
+
+    def test_portable_skill_ends_with_canonical_body_verbatim(self):
+        # One playbook, two editions: the portable file is preamble + the
+        # Claude edition's body, byte for byte. Catches drift between them.
+        _, canonical_body = self.frontmatter_body(self.CANONICAL)
+        self.assertTrue(
+            self.PORTABLE.read_text(encoding="utf-8").endswith(canonical_body),
+            "portable SKILL.md no longer embeds the canonical playbook verbatim "
+            "— regenerate it from skills/superlearn/SKILL.md",
+        )
+
+    def test_portable_skill_frontmatter_meets_agent_skills_spec(self):
+        frontmatter, body = self.frontmatter_body(self.PORTABLE)
+        self.assertIn("name: superlearn", frontmatter)  # must match its directory
+        desc = [l for l in frontmatter.splitlines() if l.startswith("description:")]
+        self.assertEqual(len(desc), 1)
+        self.assertLessEqual(len(desc[0]), 1024)
+        self.assertIn("{{SUPERLEARN_ROOT}}", body)  # installer stamp point
+
+    def test_kilo_command_and_agent_are_well_formed(self):
+        command = (ROOT / ".kilo" / "commands" / "superlearn.md").read_text(encoding="utf-8")
+        self.assertIn("$ARGUMENTS", command)
+        self.assertIn("description:", command)
+        agent = (ROOT / ".kilo" / "agents" / "superlearn-researcher.md").read_text(encoding="utf-8")
+        self.assertIn("mode: subagent", agent)
+
+    def test_codex_agent_toml_has_required_keys(self):
+        toml = (ROOT / ".codex" / "agents" / "superlearn-researcher.toml").read_text(encoding="utf-8")
+        for key in ("name = ", "description = ", "developer_instructions = "):
+            self.assertIn(key, toml)
+
+    def test_agents_md_points_at_the_skill(self):
+        self.assertIn(".agents/skills/superlearn/SKILL.md",
+                      (ROOT / "AGENTS.md").read_text(encoding="utf-8"))
+
+    def test_installer_stamps_and_uninstalls(self):
+        with tempfile.TemporaryDirectory(prefix="superlearn-home-") as home:
+            argv = [sys.executable, str(SCRIPTS / "install.py"),
+                    "--codex", "--kilocode", "--home", home]
+            r = subprocess.run(argv, capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            installed = [
+                ".agents/skills/superlearn/SKILL.md",
+                ".codex/agents/superlearn-researcher.toml",
+                ".kilo/skills/superlearn/SKILL.md",
+                ".config/kilo/commands/superlearn.md",
+                ".config/kilo/agents/superlearn-researcher.md",
+            ]
+            for rel in installed:
+                path = pathlib.Path(home) / rel
+                self.assertTrue(path.is_file(), rel)
+                self.assertNotIn("{{SUPERLEARN_ROOT}}", path.read_text(encoding="utf-8"), rel)
+            stamped = (pathlib.Path(home) / installed[0]).read_text(encoding="utf-8")
+            self.assertIn(f'export CLAUDE_PLUGIN_ROOT="{ROOT}"', stamped)
+            r = subprocess.run(argv + ["--uninstall"], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            for rel in installed:
+                self.assertFalse((pathlib.Path(home) / rel).exists(), rel)
+
+
 class AppTests(unittest.TestCase):
     def test_manifests_are_valid(self):
         plugin = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text())

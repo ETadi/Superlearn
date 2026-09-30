@@ -2,12 +2,19 @@
 
 # ✦ Superlearn
 
-**Learn anything, deeply — from inside Claude Code.**
+<p>
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Claude%20Code-plugin-D97757?logo=claude&logoColor=white" alt="Works with Claude Code"></a>
+  <a href="https://developers.openai.com/codex/"><img src="https://img.shields.io/badge/OpenAI%20Codex-agent%20skill-000000" alt="Works with OpenAI Codex"></a>
+  <a href="https://kilo.ai"><img src="https://img.shields.io/badge/Kilo%20Code-agent%20skill-6E56CF" alt="Works with Kilo Code"></a>
+</p>
+
+**Learn anything, deeply — from inside your coding agent.**
 
 Give it a topic. It researches the live web, designs a page that fits the subject,
 and serves you an interactive learning board that keeps growing as you ask for more.
 
-*No API keys. Runs on your Claude Code subscription. Everything saved on your disk.*
+*No API keys. Runs on the agent subscription you already have — Claude Code,
+OpenAI Codex, or Kilo. Everything saved on your disk.*
 
 </div>
 
@@ -22,30 +29,60 @@ and serves you an interactive learning board that keeps growing as you ask for m
 
 ## What it is
 
-Superlearn is a Claude Code plugin. You type `/superlearn <topic>`; Claude researches the live web itself, pulls real videos from YouTube and papers from arXiv, runs an iterative research loop until the topic is genuinely covered, synthesizes everything into a curated learning board, and launches a local web app to study it in.
+Superlearn is a Claude Code plugin that also ships as a standard [Agent Skill](https://agentskills.io) for **OpenAI Codex** and **Kilo** (formerly Kilo Code). You type `/superlearn <topic>`; the agent researches the live web itself, pulls real videos from YouTube and papers from arXiv, runs an iterative research loop until the topic is genuinely covered, synthesizes everything into a curated learning board, and launches a local web app to study it in.
 
 It is built for people who want **mastery**, not a summary. There are no quizzes, no streaks, no gamification — the material is research notes, concept deep-dives, diagrams and mindmaps, curated papers, working code, and learning roadmaps. Blocks are as long as the teaching requires and nothing is trimmed.
 
-And it doesn't stop when the page loads: keep talking to the same Claude Code session — *"go deeper on X"*, *"add the original papers"*, *"make it feel more academic"* — and the page updates itself in place within seconds.
+And it doesn't stop when the page loads: keep talking to the same agent session — *"go deeper on X"*, *"add the original papers"*, *"make it feel more academic"* — and the page updates itself in place within seconds.
 
 ## Quick start
 
-**Requirements:** [Claude Code](https://claude.com/claude-code) and Python 3.9+. That's it — every script is Python standard library, so there is nothing to `pip install`.
+**Requirements:** [Claude Code](https://claude.com/claude-code), [OpenAI Codex](https://developers.openai.com/codex/), or [Kilo](https://kilo.ai) — plus Python 3.9+. That's it — every script is Python standard library, so there is nothing to `pip install`.
 
-**Install from the marketplace:**
+**Install from the marketplace (Claude Code):**
 
 ```
 /plugin marketplace add raiyanyahya/superlearn
 /plugin install superlearn@superlearn-marketplace
 ```
 
-**Or run it from a clone:**
+**Or run it from a clone (Claude Code):**
 
 ```bash
 git clone https://github.com/raiyanyahya/superlearn
 cd your-project
 claude --plugin-dir /path/to/superlearn
 ```
+
+**OpenAI Codex or Kilo:** clone the repo and run the installer once —
+
+```bash
+git clone https://github.com/raiyanyahya/superlearn
+python3 superlearn/scripts/install.py --codex      # and/or --kilocode
+```
+
+It copies the same playbook, packaged as a standard Agent Skill, into each
+tool's global config (stamping the clone's path, so re-run it if you move the
+clone). Then invoke it from any project: `$superlearn <topic>` in Codex,
+`/superlearn <topic>` in Kilo — or just ask to learn something and the skill
+triggers itself. Two setup notes:
+
+- **Codex** sandboxes network access by default, and Superlearn needs it (the
+  YouTube/arXiv scrapers, and your browser reaching the local app). Add to
+  `~/.codex/config.toml`:
+
+  ```toml
+  [sandbox_workspace_write]
+  network_access = true
+  ```
+
+- **Kilo** has web search built in for its own provider; on other providers
+  enable it under **Settings → Web Tools** (or `"web_search": true` in
+  `kilo.jsonc`).
+
+Running the agent *inside* the clone needs no install at all — both tools
+auto-discover the skill from `.agents/skills/` (and Kilo picks up the
+`/superlearn` command from `.kilo/commands/`).
 
 **Then just ask:**
 
@@ -235,7 +272,7 @@ Nothing leaves your machine except the research requests themselves. Boards are 
 
 ## Keep iterating
 
-The session stays live. While the server runs, keep talking to Claude Code:
+The session stays live. While the server runs, keep talking to your agent:
 
 - *"Add a section on error correction"*
 - *"Go deeper on decoherence — include the original papers"*
@@ -256,6 +293,7 @@ Every script is standalone, stdlib-only, and usable on its own.
 | `export_html.py` | Bakes a board into one self-contained HTML file (`--offline` inlines Mermaid, KaTeX, highlight.js and figures) |
 | `serve.py` | Local app server + boards/research API |
 | `publish.py` | Pushes your exported boards to a `gh-pages` branch with a generated index |
+| `install.py` | Installs the skill/command/agents into OpenAI Codex and Kilo global config |
 
 Serve existing boards any time without re-researching:
 
@@ -278,11 +316,15 @@ The full schema and the rules Claude follows live in [`skills/superlearn/SKILL.m
 ## Repository layout
 
 ```
-.claude-plugin/    plugin + marketplace manifests
-commands/          the /superlearn slash command
+.claude-plugin/    plugin + marketplace manifests (Claude Code)
+commands/          the /superlearn slash command (Claude Code)
 skills/superlearn/ the research → design → author → serve → iterate playbook
-agents/            parallel subtopic researcher
-scripts/           scrapers, validator, exporter, server, publisher
+agents/            parallel subtopic researcher (Claude Code)
+.agents/skills/    the same playbook as a portable Agent Skill (Codex + Kilo)
+.codex/agents/     the researcher as a Codex sub-agent role
+.kilo/             the /superlearn command + researcher subagent for Kilo
+AGENTS.md          repo instructions for agents that read the AGENTS.md standard
+scripts/           scrapers, validator, exporter, server, publisher, installer
 app/               the Superlearn web app (single file, zero build step)
 examples/          ready-to-serve example boards
 tests/             stdlib-only test suite (python3 -m unittest discover -s tests)
@@ -290,7 +332,7 @@ tests/             stdlib-only test suite (python3 -m unittest discover -s tests
 
 ## Notes on privacy and security
 
-- **No API keys.** Superlearn runs on your Claude Code subscription; nothing is proxied through a third party.
+- **No API keys.** Superlearn runs on the Claude Code, Codex, or Kilo subscription you already have; nothing is proxied through a third party.
 - **The server is loopback-only** by default and validates the `Host` header, so a web page can't reach it via DNS rebinding. Bind wider deliberately with `--host` if you want to read boards from your phone.
 - **Board content is treated as untrusted** — it's authored from scraped pages. The app escapes all rendered markdown, refuses non-`http(s)` links, and pins video embeds to validated IDs; exports neutralize the payload for HTML script context.
 - **Research files are served read-only**, with path-traversal protection.
